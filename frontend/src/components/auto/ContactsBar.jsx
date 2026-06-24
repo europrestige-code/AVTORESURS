@@ -3,7 +3,7 @@ import { Phone, MessageCircle, Send, Mail, MapPin, Clock } from "lucide-react";
 
 const PHONE_NZ = "+64 21 425 233";
 const PHONE_RU = "+7 913 512 1934";
-const EMAIL = "info@avtoresurs.nz";
+const EMAIL = "europrestige@gmail.com";
 const WHATSAPP_URL = "https://wa.me/6421425233";
 const TELEGRAM_URL = "https://t.me/avtoresurs";
 

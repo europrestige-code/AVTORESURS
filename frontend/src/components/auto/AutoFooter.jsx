@@ -63,8 +63,8 @@ export default function AutoFooter() {
             <a className="flex items-center gap-2 hover:text-white" href="tel:+79135121934">
               <Phone size={14} className="text-blue-400" /> +7 913 512 1934 (RU)
             </a>
-            <a className="flex items-center gap-2 hover:text-white" href="mailto:info@avtoresurs.nz">
-              <Mail size={14} className="text-blue-400" /> info@avtoresurs.nz
+            <a className="flex items-center gap-2 hover:text-white" href="mailto:europrestige@gmail.com">
+              <Mail size={14} className="text-blue-400" /> europrestige@gmail.com
             </a>
             <div className="flex items-center gap-2">
               <MapPin size={14} className="text-blue-400" /> Auckland, New Zealand

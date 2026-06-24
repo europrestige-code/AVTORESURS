@@ -2,28 +2,59 @@ import React, { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import autoApi from "../../services/autoApi";
 import {
-  Car,           // Cars / Auctions
-  Wrench,        // Damaged
-  Recycle,       // End of Life / Donor
-  CreditCard,    // Buy Now
-  CalendarDays,  // Auctions calendar
-  Bike,          // Motorbikes
-  Anchor,        // Boats / Marine
-  Truck,         // Trucks & machinery
-  Bus,           // Buses & motorhomes
-  Cog,           // Parts
+  CalendarDays,
+  Bike,
+  Anchor,
+  Truck,
+  Bus,
+  Cog,
 } from "lucide-react";
 
 /**
  * Horizontal strip of category quick-filters at the top of every /auto page.
- * Each tile has a real SVG icon + a live count fetched from /catalog-summary.
- * Items marked `soon: true` render greyed-out with a "скоро" pill.
+ *
+ * The four "live" categories (Аукционы, Купить сейчас, Повреждённые,
+ * Списанные авто) use a real photo background so the strip looks like a
+ * premium SaaS instead of a row of generic icons. The remaining tiles
+ * (Календарь + future verticals) keep the lucide icon look.
  */
 const ITEMS = [
-  { key: "auctions",  label: "Аукционы",       to: "/auto/auctions-list",  Icon: Car,         countKey: "auctions" },
-  { key: "buynow",    label: "Купить сейчас",  to: "/auto/buynow",         Icon: CreditCard,  countKey: "buynow" },
-  { key: "damaged",   label: "Повреждённые",   to: "/auto/damaged",        Icon: Wrench,      countKey: "damaged" },
-  { key: "eol",       label: "Списанные авто",    to: "/auto/end-of-life",    Icon: Recycle,     countKey: "eol" },
+  {
+    key: "auctions",
+    label: "Аукционы",
+    sub: "Поздние модели · пикапы",
+    to: "/auto/auctions-list",
+    countKey: "auctions",
+    photo:
+      "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?q=80&w=600&auto=format&fit=crop", // late-model ute
+  },
+  {
+    key: "buynow",
+    label: "Купить сейчас",
+    sub: "Toyota Land Cruiser и др.",
+    to: "/auto/buynow",
+    countKey: "buynow",
+    photo:
+      "https://images.unsplash.com/photo-1612544409025-8aaa7ddc1eb6?q=80&w=600&auto=format&fit=crop", // Land Cruiser style
+  },
+  {
+    key: "damaged",
+    label: "Повреждённые",
+    sub: "BMW с фронтальным ударом",
+    to: "/auto/damaged",
+    countKey: "damaged",
+    photo:
+      "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?q=80&w=600&auto=format&fit=crop", // BMW front damage style
+  },
+  {
+    key: "eol",
+    label: "Списанные авто",
+    sub: "На запчасти / донор",
+    to: "/auto/end-of-life",
+    countKey: "eol",
+    photo:
+      "https://images.unsplash.com/photo-1571974599782-87624638275e?q=80&w=600&auto=format&fit=crop",
+  },
   { key: "calendar",  label: "Календарь",      to: "/auto/auctions",       Icon: CalendarDays },
   { key: "moto",      label: "Мотоциклы",      Icon: Bike,                 soon: true },
   { key: "boats",     label: "Лодки и катера", Icon: Anchor,               soon: true },
@@ -40,11 +71,9 @@ export default function QuickCategoryStrip() {
     autoApi.get("/catalog-summary").then((r) => {
       const s = r.data || {};
       const byListing = Object.fromEntries((s.listing_types || []).map((x) => [x.value, x.count]));
-      // Compute approx category counts from the summary
       setCounts({
         auctions: byListing["auction"] || 0,
         buynow: byListing["fixed_price"] || 0,
-        // damaged + eol counts come from a separate aggregation if available
         damaged: s.damaged_count,
         eol: s.eol_count,
       });
@@ -55,32 +84,53 @@ export default function QuickCategoryStrip() {
     <nav className="qcs" data-testid="quick-category-strip" aria-label="Категории">
       <div className="qcs__inner">
         {ITEMS.map((it) => {
-          const Icon = it.Icon;
           const count = counts[it.countKey];
-          const onClick = () => {
-            if (it.soon) return;
-            if (it.to) navigate(it.to);
-          };
-          const Cmp = it.soon ? "button" : NavLink;
-          const cmpProps = it.soon
-            ? { type: "button", onClick, disabled: true }
-            : { to: it.to, className: ({ isActive }) => `qcs__item ${isActive ? "qcs__item--active" : ""}` };
+          const onClick = () => { if (!it.soon && it.to) navigate(it.to); };
+          const hasPhoto = !!it.photo;
+
+          if (it.soon || !hasPhoto) {
+            const Icon = it.Icon;
+            const Cmp = it.soon ? "button" : NavLink;
+            const cmpProps = it.soon
+              ? { type: "button", onClick, disabled: true }
+              : { to: it.to, className: ({ isActive }) => `qcs__item ${isActive ? "qcs__item--active" : ""}` };
+            return (
+              <Cmp
+                key={it.key}
+                {...cmpProps}
+                className={typeof cmpProps.className === "function" ? cmpProps.className : `qcs__item ${it.soon ? "qcs__item--soon" : ""}`}
+                data-testid={`qcs-${it.key}`}
+              >
+                <span className="qcs__icon" aria-hidden>
+                  {Icon && <Icon size={22} strokeWidth={1.7} />}
+                </span>
+                <span className="qcs__label">{it.label}</span>
+                {typeof count === "number" && count > 0 && (
+                  <span className="qcs__count" data-testid={`qcs-count-${it.key}`}>{count}</span>
+                )}
+                {it.soon && <span className="qcs__badge">скоро</span>}
+              </Cmp>
+            );
+          }
+
+          // Photo-backed tile
           return (
-            <Cmp
+            <NavLink
               key={it.key}
-              {...cmpProps}
-              className={typeof cmpProps.className === "function" ? cmpProps.className : `qcs__item ${it.soon ? "qcs__item--soon" : ""}`}
+              to={it.to}
+              className={({ isActive }) => `qcs__photo ${isActive ? "qcs__photo--active" : ""}`}
               data-testid={`qcs-${it.key}`}
             >
-              <span className="qcs__icon" aria-hidden>
-                <Icon size={22} strokeWidth={1.7} />
+              <img src={it.photo} alt={it.label} loading="lazy" />
+              <span className="qcs__photo__shade" />
+              <span className="qcs__photo__body">
+                <span className="qcs__photo__label">{it.label}</span>
+                {it.sub && <span className="qcs__photo__sub">{it.sub}</span>}
               </span>
-              <span className="qcs__label">{it.label}</span>
               {typeof count === "number" && count > 0 && (
-                <span className="qcs__count" data-testid={`qcs-count-${it.key}`}>{count}</span>
+                <span className="qcs__photo__count" data-testid={`qcs-count-${it.key}`}>{count}</span>
               )}
-              {it.soon && <span className="qcs__badge">скоро</span>}
-            </Cmp>
+            </NavLink>
           );
         })}
       </div>

@@ -23,7 +23,7 @@ DEFAULT_MODEL = ("openai", "gpt-5.2")
 FALLBACK_MODEL = ("openai", "gpt-4o-mini")
 
 SYSTEM_PROMPT = """\
-Ты — Тина, AI-ассистент платформы АвтоРесурс (BuyAnywhere Auto). Отвечаешь
+Ты — Татьяна, AI-ассистент платформы АвтоРесурс (BuyAnywhere Auto). Отвечаешь
 всегда по-русски, тёплым, профессиональным тоном. Никогда не выдаёшь себя за
 человека — если спрашивают, говоришь: «Я ИИ-помощник АвтоРесурс».
 
@@ -100,7 +100,7 @@ RU-customs (рублёвые):
   год, объём двигателя, мощность и подскажи открыть калькулятор
   «Рассчитать под ключ в РФ» на странице авто.
 - Если клиент хочет говорить с человеком: WhatsApp +64 21 425 233, тел
-  NZ +64 21 080 94550, RU +7 913 512 1934, email info@avtoresurs.nz.
+  NZ +64 21 080 94550, RU +7 913 512 1934, email europrestige@gmail.com.
 
 Отвечай кратко (3-6 предложений), используй понятные пункты при необходимости.
 """
@@ -114,7 +114,7 @@ class AutoChatService:
 
     async def reply(self, history: List[Dict[str, str]], message: str,
                     session_id: Optional[str] = None) -> Dict[str, Any]:
-        """Send a chat message and get Tina's response.
+        """Send a chat message and get Tatiana's response.
 
         `history` is a list of {role: 'user'|'assistant', content: str}. We
         feed only the most recent MAX_HISTORY turns to keep prompts compact.
@@ -131,9 +131,9 @@ class AutoChatService:
             c = (h.get("content") or "").strip()
             if not c:
                 continue
-            chunks.append(("Пользователь" if r == "user" else "Тина") + ": " + c)
+            chunks.append(("Пользователь" if r == "user" else "Татьяна") + ": " + c)
         chunks.append("Пользователь: " + message.strip())
-        chunks.append("Тина:")
+        chunks.append("Татьяна:")
         prompt = "\n".join(chunks)
 
         async def _ask(model):

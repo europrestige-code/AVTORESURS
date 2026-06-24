@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from "./contexts/AuthContext";
 import { Header } from "./components/Header";
@@ -166,21 +166,26 @@ function App() {
               {/* Regular app routes */}
               <Route path="/*" element={
                 <>
-                  <Header />
                   <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/logo-showcase" element={<LogoShowcase />} />
-                    <Route path="/seo-dashboard" element={<SEODashboard />} />
-                    <Route 
-                      path="/dashboard" 
+                    {/* Root → AvtoResurs is the only public-facing brand */}
+                    <Route path="/" element={<Navigate to="/auto" replace />} />
+                    <Route path="/logo-showcase" element={<><Header /><LogoShowcase /><Footer /></>} />
+                    <Route path="/seo-dashboard" element={<><Header /><SEODashboard /><Footer /></>} />
+                    <Route
+                      path="/dashboard"
                       element={
-                        <ProtectedRoute>
-                          <CustomerDashboard />
-                        </ProtectedRoute>
-                      } 
+                        <>
+                          <Header />
+                          <ProtectedRoute>
+                            <CustomerDashboard />
+                          </ProtectedRoute>
+                          <Footer />
+                        </>
+                      }
                     />
+                    {/* Anything else → redirect to AvtoResurs */}
+                    <Route path="*" element={<Navigate to="/auto" replace />} />
                   </Routes>
-                  <Footer />
                 </>
               } />
             </Routes>

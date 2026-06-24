@@ -19,7 +19,7 @@ function saveHistory(history) {
 
 const GREETING = {
   role: "assistant",
-  content: "Здравствуйте! Я Тина — ИИ-ассистент АвтоРесурс. Помогу разобраться с покупкой авто из НЗ или Австралии. Что вас интересует?",
+  content: "Здравствуйте! Я Татьяна — ИИ-ассистент АвтоРесурс. Помогу разобраться с покупкой авто из НЗ или Австралии. Что вас интересует?",
 };
 
 export default function ChatWidget() {
@@ -95,7 +95,7 @@ export default function ChatWidget() {
           aria-label="Открыть чат"
         >
           <MessageCircle size={26} strokeWidth={2} />
-          <span className="chat-fab__label">Спросить Тину</span>
+          <span className="chat-fab__label">Спросить Татьяну</span>
         </button>
       )}
       {open && (
@@ -104,7 +104,7 @@ export default function ChatWidget() {
             <div className="chat-panel__title">
               <span className="chat-panel__avatar"><Bot size={18} /></span>
               <div>
-                <div style={{ fontWeight: 700 }}>Тина · АвтоРесурс</div>
+                <div style={{ fontWeight: 700 }}>Татьяна · АвтоРесурс</div>
                 <div className="auto-muted" style={{ fontSize: 11 }}>Отвечает по-русски, обычно за пару секунд</div>
               </div>
             </div>
@@ -120,7 +120,7 @@ export default function ChatWidget() {
             ))}
             {busy && (
               <div className="chat-msg chat-msg--assistant chat-msg--typing" data-testid="chat-typing">
-                Тина печатает<span className="chat-dots"><span/><span/><span/></span>
+                Татьяна печатает<span className="chat-dots"><span/><span/><span/></span>
               </div>
             )}
           </div>

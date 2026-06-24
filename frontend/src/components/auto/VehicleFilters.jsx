@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from "react";
+import { getFxRate } from "../../services/autoCurrency";
 
+/**
+ * VehicleFilters — customer-facing filter form.
+ *
+ * Price filters accept input in ROUBLES (consistent with the rest of the
+ * customer-facing UI). We convert ₽ → NZD using the cached display rate
+ * before calling onApply, since the backend still expects NZD.
+ */
 export default function VehicleFilters({ value, onChange, onApply }) {
   const [local, setLocal] = useState(value || {});
+  const [fx, setFx] = useState(null);
 
   useEffect(() => setLocal(value || {}), [value]);
+  useEffect(() => { getFxRate().then(setFx); }, []);
+
+  const rate = fx?.nzd_to_rub_display || 57.68;
 
   const update = (k, v) => {
     const next = { ...local, [k]: v === "" ? undefined : v };
@@ -11,13 +23,21 @@ export default function VehicleFilters({ value, onChange, onApply }) {
     onChange?.(next);
   };
 
+  const submit = (e) => {
+    e?.preventDefault?.();
+    // Convert RUB → NZD for the backend
+    const out = { ...local };
+    if (local.price_from_rub) out.price_from = Math.round(Number(local.price_from_rub) / rate);
+    if (local.price_to_rub)   out.price_to   = Math.round(Number(local.price_to_rub) / rate);
+    delete out.price_from_rub;
+    delete out.price_to_rub;
+    onApply?.(out);
+  };
+
   return (
     <form
       className="auto-card"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onApply?.(local);
-      }}
+      onSubmit={submit}
       data-testid="vehicle-filters"
       style={{ display: "grid", gap: 10 }}
     >
@@ -51,8 +71,8 @@ export default function VehicleFilters({ value, onChange, onApply }) {
         <input className="auto-input" placeholder="Год до" type="number" value={local.year_to || ""} onChange={(e) => update("year_to", e.target.value)} data-testid="filter-year-to" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <input className="auto-input" placeholder="Цена от NZ$" type="number" value={local.price_from || ""} onChange={(e) => update("price_from", e.target.value)} data-testid="filter-price-from" />
-        <input className="auto-input" placeholder="Цена до NZ$" type="number" value={local.price_to || ""} onChange={(e) => update("price_to", e.target.value)} data-testid="filter-price-to" />
+        <input className="auto-input" placeholder="Цена от ₽" type="number" value={local.price_from_rub || ""} onChange={(e) => update("price_from_rub", e.target.value)} data-testid="filter-price-from" />
+        <input className="auto-input" placeholder="Цена до ₽" type="number" value={local.price_to_rub || ""} onChange={(e) => update("price_to_rub", e.target.value)} data-testid="filter-price-to" />
       </div>
       <button type="submit" className="auto-btn" data-testid="filter-apply-btn">Применить</button>
       <button
