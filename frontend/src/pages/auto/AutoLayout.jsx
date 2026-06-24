@@ -31,7 +31,7 @@ export default function AutoLayout() {
 
       {/* Sticky main header */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#05070B]/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-6 px-6 py-4">
+        <div className="mx-auto flex max-w-screen-2xl items-end justify-between gap-6 px-6 py-4">
           <NavLink to="/auto" end className="flex items-center" data-testid="auto-brand">
             <img
               src="/branding/avtoresurs-lockup.png?v=3"
@@ -61,25 +61,25 @@ export default function AutoLayout() {
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
-                <NavLink to="/auto/dashboard" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-6 h-20 text-sm hover:bg-white/10 lg:h-24" data-testid="nav-dashboard">
+                <NavLink to="/auto/dashboard" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 h-12 text-sm hover:bg-white/10" data-testid="nav-dashboard">
                   Мой кабинет
                 </NavLink>
                 {user?.role === "admin" && (
-                  <NavLink to="/auto/admin" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 h-20 text-sm font-semibold text-white hover:bg-blue-500 lg:h-24" data-testid="nav-admin">
+                  <NavLink to="/auto/admin" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 h-12 text-sm font-semibold text-white hover:bg-blue-500" data-testid="nav-admin">
                     Админ
                   </NavLink>
                 )}
-                <button onClick={logout} className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 h-20 text-sm hover:bg-white/10 lg:h-24" data-testid="nav-logout">
+                <button onClick={logout} className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 h-12 text-sm hover:bg-white/10" data-testid="nav-logout">
                   Выйти
                 </button>
               </>
             ) : (
               <>
-                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-6 h-20 text-base font-medium hover:bg-white/10 transition whitespace-nowrap lg:h-24" data-testid="nav-login">
-                  <User className="mr-2 h-5 w-5" />
+                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 h-12 text-sm font-medium hover:bg-white/10 transition whitespace-nowrap" data-testid="nav-login">
+                  <User className="mr-2 h-4 w-4" />
                   Войти
                 </NavLink>
-                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 h-20 text-base font-semibold text-white hover:bg-blue-500 transition whitespace-nowrap lg:h-24" data-testid="nav-register">
+                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 h-12 text-sm font-semibold text-white hover:bg-blue-500 transition whitespace-nowrap" data-testid="nav-register">
                   Зарегистрироваться
                 </NavLink>
               </>
