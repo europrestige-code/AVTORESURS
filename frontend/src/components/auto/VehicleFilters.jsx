@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import autoApi from "../../services/autoApi";
 import { getFxRate } from "../../services/autoCurrency";
 
 /**
@@ -7,25 +8,37 @@ import { getFxRate } from "../../services/autoCurrency";
  * Price filters accept input in ROUBLES (consistent with the rest of the
  * customer-facing UI). We convert ₽ → NZD using the cached display rate
  * before calling onApply, since the backend still expects NZD.
+ *
+ * Make / Model are cascading dropdowns sourced from /api/auto/makes.
  */
 export default function VehicleFilters({ value, onChange, onApply }) {
   const [local, setLocal] = useState(value || {});
   const [fx, setFx] = useState(null);
+  const [makes, setMakes] = useState([]);
 
   useEffect(() => setLocal(value || {}), [value]);
   useEffect(() => { getFxRate().then(setFx); }, []);
+  useEffect(() => {
+    autoApi.get("/makes").then((r) => setMakes(r.data?.items || [])).catch(() => {});
+  }, []);
 
   const rate = fx?.nzd_to_rub_display || 57.68;
 
+  const models = useMemo(() => {
+    if (!local.make) return [];
+    const m = makes.find((x) => x.make === local.make);
+    return m?.models || [];
+  }, [makes, local.make]);
+
   const update = (k, v) => {
     const next = { ...local, [k]: v === "" ? undefined : v };
+    if (k === "make") next.model = undefined;   // reset model when make changes
     setLocal(next);
     onChange?.(next);
   };
 
   const submit = (e) => {
     e?.preventDefault?.();
-    // Convert RUB → NZD for the backend
     const out = { ...local };
     if (local.price_from_rub) out.price_from = Math.round(Number(local.price_from_rub) / rate);
     if (local.price_to_rub)   out.price_to   = Math.round(Number(local.price_to_rub) / rate);
@@ -63,8 +76,24 @@ export default function VehicleFilters({ value, onChange, onApply }) {
         </select>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <input className="auto-input" placeholder="Марка" value={local.make || ""} onChange={(e) => update("make", e.target.value)} data-testid="filter-make" />
-        <input className="auto-input" placeholder="Модель" value={local.model || ""} onChange={(e) => update("model", e.target.value)} data-testid="filter-model" />
+        <select className="auto-select" value={local.make || ""} onChange={(e) => update("make", e.target.value)} data-testid="filter-make">
+          <option value="">Любая марка</option>
+          {makes.map((m) => (
+            <option key={m.make} value={m.make}>{m.make} ({m.count})</option>
+          ))}
+        </select>
+        <select
+          className="auto-select"
+          value={local.model || ""}
+          onChange={(e) => update("model", e.target.value)}
+          disabled={!local.make}
+          data-testid="filter-model"
+        >
+          <option value="">{local.make ? "Любая модель" : "Сначала выберите марку"}</option>
+          {models.map((m) => (
+            <option key={m.model} value={m.model}>{m.model} ({m.count})</option>
+          ))}
+        </select>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <input className="auto-input" placeholder="Год от" type="number" value={local.year_from || ""} onChange={(e) => update("year_from", e.target.value)} data-testid="filter-year-from" />

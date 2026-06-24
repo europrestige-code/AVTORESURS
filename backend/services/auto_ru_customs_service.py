@@ -66,7 +66,7 @@ AVTORESURS_COMMISSION_PCT = 0.20  # АвтоРесурс service fee on FOB
 
 # Optional NZ-side service fees (per car) — applied when relevant
 INSPECTION_FEE_NZD     = 200.0   # detailed pre-purchase inspection at yard
-FORKLIFT_FEE_NZD       = 120.0   # forklift loading (for non-runners, damaged)
+FORKLIFT_FEE_NZD       = 200.0   # forklift loading (for non-runners, damaged)
 DISMANTLING_FEE_NZD    = 800.0   # cut / dismantle for parts scheme (EOL/parts)
 DOCS_FEE_NZD           = 250.0   # NZ export documents
 STORAGE_PER_DAY_NZD    = 50.0    # yard storage per day waiting for container

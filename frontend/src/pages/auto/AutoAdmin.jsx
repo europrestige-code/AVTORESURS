@@ -3,7 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import autoApi from "../../services/autoApi";
 import { fmtPrice } from "../../components/auto/VehicleCard";
 
-const TABS = ["vehicles", "bids", "deposits", "sources", "import", "branding", "auctions", "invoices", "logistics", "crm", "clients"];
+const TABS = ["vehicles", "bids", "deposits", "sources", "import", "branding", "auctions", "invoices", "logistics", "crm", "clients", "campaigns", "settings"];
 const TAB_LABEL = {
   vehicles: "Автомобили",
   bids: "Ставки",
@@ -16,6 +16,8 @@ const TAB_LABEL = {
   logistics: "Логистика",
   crm: "CRM сделки",
   clients: "Клиенты",
+  campaigns: "Рассылки",
+  settings: "Настройки",
 };
 
 export default function AutoAdmin() {
@@ -58,6 +60,8 @@ export default function AutoAdmin() {
       {tab === "logistics" && <LogisticsTab />}
       {tab === "crm" && <CrmTab />}
       {tab === "clients" && <ClientsTab />}
+      {tab === "campaigns" && <CampaignsTab />}
+      {tab === "settings" && <SettingsTab />}
     </div>
   );
 }
@@ -760,6 +764,173 @@ function AuctionsTab() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================================
+ * Email campaigns — list / generate / preview / approve & send
+ * ========================================================================== */
+function CampaignsTab() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await autoApi.get("/admin/campaigns?limit=30");
+      setItems(r.data?.items || []);
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const generate = async (slot) => {
+    setBusy(true);
+    try {
+      const r = await autoApi.post(`/admin/campaigns/generate?slot=${slot}`);
+      if (!r.data?.created) alert(r.data?.reason || "Не удалось создать кампанию");
+      await load();
+    } finally { setBusy(false); }
+  };
+
+  const showPreview = async (id) => {
+    const url = `${process.env.REACT_APP_BACKEND_URL}/api/auto/admin/campaigns/${id}/preview`;
+    setPreview(url);
+  };
+
+  const approveSend = async (id) => {
+    if (!window.confirm("Отправить кампанию всем подписчикам?")) return;
+    setBusy(true);
+    try {
+      await autoApi.post(`/admin/campaigns/${id}/approve-send`);
+      await load();
+    } finally { setBusy(false); }
+  };
+
+  if (loading) return <div className="auto-card auto-muted">Загружаем…</div>;
+  return (
+    <div className="auto-card" data-testid="admin-campaigns">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontWeight: 600 }}>Email-кампании ({items.length})</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="auto-btn" disabled={busy} onClick={() => generate("morning")} data-testid="campaign-gen-morning">+ Утренняя</button>
+          <button className="auto-btn" disabled={busy} onClick={() => generate("evening")} data-testid="campaign-gen-evening">+ Вечерняя</button>
+        </div>
+      </div>
+      <table className="auto-table">
+        <thead><tr><th>Дата</th><th>Слот</th><th>Тема</th><th>Авто</th><th>Получатели</th><th>Статус</th><th>Действия</th></tr></thead>
+        <tbody>
+          {items.map((c) => (
+            <tr key={c.id} data-testid={`campaign-row-${c.id}`}>
+              <td>{c.created_at ? new Date(c.created_at).toLocaleString("ru-RU") : "—"}</td>
+              <td>{c.slot === "morning" ? "Утро" : "Вечер"}</td>
+              <td style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subject_ru}</td>
+              <td>{c.vehicles?.length || 0}</td>
+              <td>{c.recipient_count}</td>
+              <td><span className={`auto-badge ${c.status === "sent" ? "auto-badge-success" : (c.status === "failed" ? "auto-badge-danger" : "")}`}>{c.status}</span></td>
+              <td>
+                <button className="auto-btn auto-btn-outline" onClick={() => showPreview(c.id)} data-testid={`campaign-preview-${c.id}`}>Превью</button>
+                {c.status === "draft" && (
+                  <button className="auto-btn" style={{ marginLeft: 6 }} disabled={busy} onClick={() => approveSend(c.id)} data-testid={`campaign-send-${c.id}`}>Отправить</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {preview && (
+        <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", padding: 20 }}>
+          <iframe title="email-preview" src={preview} style={{ width: "100%", margin: "auto", maxWidth: 680, height: "85vh", border: 0, borderRadius: 12, background: "#fff" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================================
+ * App settings — editable API keys, integrations, contacts
+ * ========================================================================== */
+function SettingsTab() {
+  const [data, setData] = useState(null);
+  const [form, setForm] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const load = useCallback(async () => {
+    const r = await autoApi.get("/admin/settings");
+    setData(r.data);
+    setForm({});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  if (!data) return <div className="auto-card auto-muted">Загружаем настройки…</div>;
+  const groups = {};
+  for (const s of data.schema) {
+    (groups[s.group] = groups[s.group] || []).push(s);
+  }
+  const GROUP_LABEL = {
+    contacts: "Контакты и адреса",
+    currency: "Валюта и депозит",
+    email:    "Email-рассылка",
+    sms:      "SMS-провайдер",
+    payments: "Платежи (Stripe)",
+    ai:       "AI-ассистент",
+  };
+
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const valueFor = (s) => form[s.key] !== undefined ? form[s.key] : (data.values[s.key] ?? (s.default ?? ""));
+
+  const save = async () => {
+    setBusy(true);
+    setSaved(false);
+    try {
+      const r = await autoApi.put("/admin/settings", form);
+      setData(r.data);
+      setForm({});
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div data-testid="admin-settings" style={{ display: "grid", gap: 16 }}>
+      <div className="auto-card auto-muted" style={{ fontSize: 13 }}>
+        Секретные поля показаны замаскированно (последние 4 символа). Чтобы оставить
+        как есть — не меняйте поле. Чтобы заменить — введите новое значение.
+      </div>
+      {Object.entries(groups).map(([g, fields]) => (
+        <div key={g} className="auto-card">
+          <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 16 }}>{GROUP_LABEL[g] || g}</div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {fields.map((s) => (
+              <div key={s.key} style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 12, alignItems: "center" }}>
+                <label className="auto-muted" style={{ fontSize: 13 }}>{s.label} <code style={{ color: "#555", fontSize: 11 }}>{s.key}</code></label>
+                {s.type === "select" ? (
+                  <select className="auto-select" value={valueFor(s)} onChange={(e) => setField(s.key, e.target.value)} data-testid={`settings-${s.key}`}>
+                    {s.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : s.type === "bool" ? (
+                  <input type="checkbox" checked={!!valueFor(s)} onChange={(e) => setField(s.key, e.target.checked)} data-testid={`settings-${s.key}`} />
+                ) : s.type === "number" ? (
+                  <input className="auto-input" type="number" value={valueFor(s)} onChange={(e) => setField(s.key, Number(e.target.value))} data-testid={`settings-${s.key}`} />
+                ) : s.type === "secret" ? (
+                  <input className="auto-input" type="text" placeholder={data.values[s.key] || "Введите значение"} value={form[s.key] ?? ""} onChange={(e) => setField(s.key, e.target.value)} data-testid={`settings-${s.key}`} />
+                ) : (
+                  <input className="auto-input" type="text" value={valueFor(s)} onChange={(e) => setField(s.key, e.target.value)} data-testid={`settings-${s.key}`} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <button className="auto-btn" disabled={busy || !Object.keys(form).length} onClick={save} data-testid="settings-save">
+          {busy ? "Сохраняем…" : "Сохранить настройки"}
+        </button>
+        {saved && <span className="auto-muted" style={{ color: "var(--auto-success)" }}>✓ Сохранено</span>}
+      </div>
     </div>
   );
 }

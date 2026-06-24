@@ -262,6 +262,34 @@ function Hero({ onView }) {
  * ========================================================================== */
 function SearchPanel({ total, onSubmit }) {
   const [tab, setTab] = useState("all");
+  const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
+  const [makes, setMakes] = useState([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    autoApi.get("/makes").then((r) => setMakes(r.data?.items || [])).catch(() => {});
+  }, []);
+
+  const models = useMemo(() => {
+    if (!make) return [];
+    return (makes.find((m) => m.make === make)?.models || []);
+  }, [makes, make]);
+
+  const handleSubmit = () => {
+    const params = new URLSearchParams();
+    if (make) params.set("make", make);
+    if (model) params.set("model", model);
+    if (tab === "damaged") {
+      navigate(`/auto/damaged?${params.toString()}`);
+    } else if (tab === "buynow") {
+      navigate(`/auto/buynow?${params.toString()}`);
+    } else {
+      navigate(`/auto/catalog?${params.toString()}`);
+    }
+    onSubmit?.();
+  };
+
   return (
     <section className="mx-auto -mt-12 max-w-7xl px-6">
       <div
@@ -271,22 +299,22 @@ function SearchPanel({ total, onSubmit }) {
         <div className="mb-4 flex flex-wrap gap-2">
           <SearchTab id="all"     icon={Car}          label="Все автомобили" active={tab === "all"}     onClick={() => setTab("all")}     />
           <SearchTab id="damaged" icon={Wrench}       label="Повреждённые"   active={tab === "damaged"} onClick={() => setTab("damaged")} />
-          <SearchTab id="buynow"  icon={CalendarDays} label="Купить сейчас"  active={tab === "buynow"}  onClick={() => setTab("buynow")}  />
+          <SearchTab id="buynow"  icon={CalendarDays} label="Купить сейчас"  active={tab === "buynow"} onClick={() => setTab("buynow")}  />
         </div>
 
         <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <Select label="Марка"      value="Любая марка"    />
-          <Select label="Модель"     value="Любая модель"   />
-          <Select label="Год от"     value="2010"           />
-          <Select label="Год до"     value="2024"           />
-          <Select label="Цена от"    value="₽ 0"            />
-          <Select label="Цена до"    value="₽ 6 000 000+"   />
+          <SelectMake label="Марка" value={make} onChange={(v) => { setMake(v); setModel(""); }} options={makes} />
+          <SelectModel label="Модель" value={model} onChange={setModel} options={models} disabled={!make} />
+          <SelectStatic label="Год от"     value="2010"           />
+          <SelectStatic label="Год до"     value="2024"           />
+          <SelectStatic label="Цена от"    value="₽ 0"            />
+          <SelectStatic label="Цена до"    value="₽ 6 000 000+"   />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
-            onClick={onSubmit}
+            onClick={handleSubmit}
             className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-7 py-3 font-bold transition hover:bg-blue-500"
             data-testid="search-submit"
           >
@@ -304,6 +332,47 @@ function SearchPanel({ total, onSubmit }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function SelectMake({ label, value, onChange, options }) {
+  return (
+    <label className="rounded-xl bg-[#070A12] px-4 py-3 ring-1 ring-white/5 block cursor-pointer">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">{label}</div>
+      <select
+        className="mt-1 w-full bg-transparent font-semibold text-white outline-none"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        data-testid="search-make"
+      >
+        <option value="" style={{ background: "#070A12" }}>Любая марка</option>
+        {options.map((m) => (
+          <option key={m.make} value={m.make} style={{ background: "#070A12" }}>{m.make} ({m.count})</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SelectModel({ label, value, onChange, options, disabled }) {
+  return (
+    <label className={`rounded-xl bg-[#070A12] px-4 py-3 ring-1 ring-white/5 block ${disabled ? "opacity-60" : "cursor-pointer"}`}>
+      <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">{label}</div>
+      <select
+        className="mt-1 w-full bg-transparent font-semibold text-white outline-none disabled:cursor-not-allowed"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        data-testid="search-model"
+      >
+        <option value="" style={{ background: "#070A12" }}>
+          {disabled ? "Сначала марку" : "Любая модель"}
+        </option>
+        {options.map((m) => (
+          <option key={m.model} value={m.model} style={{ background: "#070A12" }}>{m.model} ({m.count})</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -325,7 +394,7 @@ function SearchTab({ id, icon: Icon, label, active, onClick }) {
   );
 }
 
-function Select({ label, value }) {
+function SelectStatic({ label, value }) {
   return (
     <div className="rounded-xl bg-[#070A12] px-4 py-3 ring-1 ring-white/5">
       <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">{label}</div>

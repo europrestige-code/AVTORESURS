@@ -578,8 +578,8 @@
 /* --- Chat widget --- */
 .auto-root .chat-fab {
   position: fixed;
-  bottom: 90px;
-  right: 22px;
+  bottom: 24px;
+  right: 24px;
   z-index: 9999;
   display: inline-flex;
   align-items: center;
@@ -599,7 +599,7 @@
 .auto-root .chat-panel {
   position: fixed;
   bottom: 90px;
-  right: 22px;
+  right: 24px;
   z-index: 9999;
   width: min(380px, calc(100vw - 32px));
   height: 540px;
@@ -746,4 +746,16 @@
   border-radius: 10px;
   background: #0066FF; color: #fff;
   font-size: 11px; font-weight: 700; text-align: center;
+}
+
+/* --- Hide the "Made with Emergent" preview badge on /auto pages --- */
+.auto-root #emergent-badge,
+.auto-root [id^="emergent-badge"],
+body > [data-emergent-badge],
+iframe[src*="emergent"][title*="Emergent"],
+a[href*="emergent.sh"][target="_blank"],
+a[href*="emergentlabs.ai"][target="_blank"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

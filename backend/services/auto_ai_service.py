@@ -71,6 +71,11 @@ class AutoAIService:
             ).with_model(*FALLBACK_MODEL)
             return await chat.send_message(UserMessage(text=prompt))
 
+    async def chat(self, prompt: str, system: str = "You are a helpful assistant.",
+                    max_tokens: int = 800) -> str:
+        """Public helper used by other services (e.g. email campaigns)."""
+        return await self._ask(system, prompt)
+
     # ---- 1. Structured extraction from raw text ----
     EXTRACTION_SYSTEM = (
         "Вы — эксперт по аукционным и розничным объявлениям об автомобилях из Новой Зеландии и Австралии. "

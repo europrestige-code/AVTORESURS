@@ -135,7 +135,7 @@ export const CATEGORY_DEFS = {
   auctions: {
     key: "auctions",
     title: "Аукционы",
-    subtitle: "Авто на торгах из Turners, Manheim, Pickles. Требуется внутренний депозит NZ$1,000.",
+    subtitle: "Авто на торгах из Turners, Manheim, Pickles. Требуется внутренний депозит ≈ 43 600 ₽ (NZ$1 000).",
     icon: "🏁",
     apiFilters: { listing_type: "auction" },
     tips: [

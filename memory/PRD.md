@@ -43,7 +43,28 @@ framework.
 
 ## What's been implemented (2026-01)
 
-### 2026-02 — AutoHome redesign + chat FAB fix
+### 2026-02 — RUB-only display + admin settings + campaigns
+- ✅ All public prices converted to RUB via `/api/auto/fx-rate` (Google + 3% markup, 1h cache). Removed every customer-facing NZ$ reference (VehicleCard, AutoVehicleDetail, AutoDashboard, AutoFees, AutoHowItWorks, AutoTerms, CategoryPage, PriceBreakdown, SearchPanel, HotCard).
+- ✅ NZ transport tariffs recalibrated to PTS Vehicle Logistics-style rates (Auckland $0 → Hamilton/Whangarei $250 → Wellington $790 → Christchurch $1,100 → Invercargill $1,700; ×2 for non-runners).
+- ✅ Forklift fee bumped to NZ$200 (was $120).
+- ✅ Cascading Make → Model dropdowns powered by new `/api/auto/makes` endpoint (counts + models per make).
+- ✅ Email campaign infrastructure (`auto_email_service.py`):
+    - Scheduler runs 09:00 + 17:00 NZ generating drafts of ≤5 random late-model auctions with AI-written Russian copy.
+    - Marketing consent **ON by default** (per spec); unsubscribe via signed HMAC token.
+    - Admin tab "Рассылки": list / generate / preview HTML / "Одобрить и отправить".
+    - Provider pluggable: stub (default), sendsay/mailchimp/resend stubs ready for keys.
+- ✅ Admin "Настройки" tab — fully editable settings persisted in `app_settings` collection:
+    - Contacts/URLs, currency markup, deposit amount, email provider+API key, SMS provider+credentials, Stripe keys, AI persona name+toggle. Secrets masked in GET; preserved on empty PUT.
+- ✅ Removed "Made with Emergent" preview badge from index.html.
+- ✅ Hot Daily reduced to max 2 picks ("Самый свежий" + "Самый выгодный"), under-5-years rule, auctions-only.
+- ✅ Root `/` redirects to `/auto`; "*" wildcard also redirects.
+- ✅ AI assistant renamed "Тина" → "Татьяна" (FAB, panel, AI prompt).
+- ✅ Email: `info@avtoresurs.nz` → `europrestige@gmail.com`.
+- ✅ QuickCategoryStrip uses photo-backed tiles (Аукционы / Купить сейчас / Повреждённые / Списанные авто).
+- ✅ Manheim NZ + Pickles AU real scrapers (HTML parsers vs. previous URL-stub).
+- ✅ Branch-aware Landed Price modal popup on every VehicleCard with smart defaults for DAMAGED/EOL.
+
+
 - ✅ Rebuilt `AutoHome.jsx` to match user-provided Tailwind reference: full-bleed hero with car/right-side imagery + radial blue glow, search panel with 3 tabs (Все автомобили / Повреждённые / Купить сейчас), Ближайшие аукционы grid (live data from `/api/auto/auctions/calendar`), Почему выбирают нас stats (10+/50 000+/30+/100%), Популярные категории grid, CTA panel, footer features row.
 - ✅ Chat FAB moved to `bottom: 90px; z-index: 9999` so it clears the Emergent preview badge. Verified end-to-end: Тина greets in Russian, responds with NZ$1,000 deposit info.
 - ✅ QuickCategoryStrip "End of Life" tile renamed to "Списанные авто" (i18n consistency).

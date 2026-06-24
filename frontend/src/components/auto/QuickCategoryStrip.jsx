@@ -22,38 +22,34 @@ const ITEMS = [
   {
     key: "auctions",
     label: "Аукционы",
-    sub: "Поздние модели · пикапы",
     to: "/auto/auctions-list",
     countKey: "auctions",
     photo:
-      "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?q=80&w=600&auto=format&fit=crop", // late-model ute
+      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=600&auto=format&fit=crop",
   },
   {
     key: "buynow",
     label: "Купить сейчас",
-    sub: "Toyota Land Cruiser и др.",
     to: "/auto/buynow",
     countKey: "buynow",
     photo:
-      "https://images.unsplash.com/photo-1612544409025-8aaa7ddc1eb6?q=80&w=600&auto=format&fit=crop", // Land Cruiser style
+      "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?q=80&w=600&auto=format&fit=crop",
   },
   {
     key: "damaged",
     label: "Повреждённые",
-    sub: "BMW с фронтальным ударом",
     to: "/auto/damaged",
     countKey: "damaged",
     photo:
-      "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?q=80&w=600&auto=format&fit=crop", // BMW front damage style
+      "https://images.pexels.com/photos/3608542/pexels-photo-3608542.jpeg?cs=srgb&w=600", // damaged late-model car
   },
   {
     key: "eol",
     label: "Списанные авто",
-    sub: "На запчасти / донор",
     to: "/auto/end-of-life",
     countKey: "eol",
     photo:
-      "https://images.unsplash.com/photo-1571974599782-87624638275e?q=80&w=600&auto=format&fit=crop",
+      "https://images.pexels.com/photos/210019/pexels-photo-210019.jpeg?cs=srgb&w=600", // abandoned/scrap car
   },
   { key: "calendar",  label: "Календарь",      to: "/auto/auctions",       Icon: CalendarDays },
   { key: "moto",      label: "Мотоциклы",      Icon: Bike,                 soon: true },

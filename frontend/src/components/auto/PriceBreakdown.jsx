@@ -1,5 +1,5 @@
 import React from "react";
-import { fmtPrice } from "./VehicleCard";
+import { formatRub } from "../../services/autoCurrency";
 
 const LINES = [
   ["vehicle_price_nzd", "Цена автомобиля"],
@@ -32,23 +32,15 @@ export default function PriceBreakdown({ breakdown, label = "Расчёт сто
                   </div>
                 )}
               </td>
-              <td style={{ textAlign: "right" }}>{fmtPrice(breakdown[k])}</td>
+              <td style={{ textAlign: "right" }}>{formatRub(breakdown[k])}</td>
             </tr>
           ))}
           <tr>
             <td style={{ fontWeight: 700 }}>Итого</td>
             <td style={{ textAlign: "right", fontWeight: 700, fontSize: 18 }}>
-              {fmtPrice(breakdown.total_nzd)}
+              {formatRub(breakdown.total_nzd)}
             </td>
           </tr>
-          {breakdown.total_rub != null && (
-            <tr>
-              <td className="auto-muted">≈ в рублях</td>
-              <td style={{ textAlign: "right" }}>
-                {Number(breakdown.total_rub).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ₽
-              </td>
-            </tr>
-          )}
         </tbody>
       </table>
     </div>

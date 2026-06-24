@@ -26,6 +26,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
     status,
 )
@@ -1312,3 +1313,168 @@ async def admin_list_crm_orders(
         o.pop("_id", None)
         items.append(o)
     return items
+
+
+# =============================================================================
+# Email campaigns
+# =============================================================================
+
+@router.get("/admin/campaigns")
+async def admin_list_campaigns(
+    limit: int = 20,
+    _: Dict[str, Any] = Depends(require_admin),
+    svc: AutoService = Depends(get_auto_service),
+):
+    """List the most recent email campaigns (drafts + sent)."""
+    cursor = svc.db.auto_email_campaigns.find({}, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return {"items": [c async for c in cursor]}
+
+
+@router.post("/admin/campaigns/generate")
+async def admin_generate_campaign(
+    slot: str = "morning",
+    _: Dict[str, Any] = Depends(require_admin),
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Manually generate a new DRAFT campaign for the given slot."""
+    from services.auto_email_service import generate_campaign_draft
+    if slot not in ("morning", "evening"):
+        raise HTTPException(400, "slot must be 'morning' or 'evening'")
+    camp = await generate_campaign_draft(svc.db, slot=slot)
+    if not camp:
+        return {"created": False, "reason": "no eligible vehicles"}
+    return {"created": True, "campaign": camp.model_dump()}
+
+
+@router.get("/admin/campaigns/{campaign_id}")
+async def admin_get_campaign(
+    campaign_id: str,
+    _: Dict[str, Any] = Depends(require_admin),
+    svc: AutoService = Depends(get_auto_service),
+):
+    doc = await svc.db.auto_email_campaigns.find_one({"id": campaign_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Campaign not found")
+    return doc
+
+
+@router.get("/admin/campaigns/{campaign_id}/preview")
+async def admin_preview_campaign(
+    campaign_id: str,
+    email: Optional[str] = None,
+    _: Dict[str, Any] = Depends(require_admin),
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Render the HTML email for one recipient (default: a sample address)."""
+    from services.auto_email_service import render_email_html
+    from models.auto import AutoEmailCampaign
+    doc = await svc.db.auto_email_campaigns.find_one({"id": campaign_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Campaign not found")
+    camp = AutoEmailCampaign(**doc)
+    html = render_email_html(camp, email or "preview@avtoresurs.nz")
+    return Response(content=html, media_type="text/html")
+
+
+@router.post("/admin/campaigns/{campaign_id}/approve-send")
+async def admin_approve_and_send(
+    campaign_id: str,
+    _: Dict[str, Any] = Depends(require_admin),
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Mark approved + ship via provider (stub by default)."""
+    from services.auto_email_service import send_campaign
+    try:
+        camp = await send_campaign(svc.db, campaign_id)
+        return {"sent": True, "campaign": camp.model_dump()}
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+# ----- Public unsubscribe endpoint -----
+
+@router.get("/unsubscribe")
+async def public_unsubscribe(
+    email: str,
+    token: str,
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Disable marketing emails for an address using a signed token.
+
+    No login required — the HMAC token authenticates the request.
+    """
+    from services.auto_email_service import verify_unsub_token
+    from datetime import datetime as _dt
+    if not verify_unsub_token(email, token):
+        raise HTTPException(400, "Invalid unsubscribe token")
+    await svc.db.users.update_one(
+        {"email": email.lower()},
+        {"$set": {"customer_info.marketing_consent": False,
+                  "updated_at": _dt.utcnow()}},
+    )
+    await svc.db.auto_email_unsubscribes.insert_one({
+        "email": email.lower(),
+        "token": token,
+        "created_at": _dt.utcnow(),
+    })
+    return {
+        "ok": True,
+        "message": "Вы отписаны от рассылки. Возобновить можно в личном кабинете.",
+    }
+
+
+@router.get("/makes")
+async def list_makes_and_models(
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Return every distinct make + its models (with counts) from the catalog.
+
+    Powers cascading Make → Model dropdowns in filters and the homepage
+    SearchPanel. Excludes nulls. Sorted by count DESC then alphabetically.
+    """
+    pipeline = [
+        {"$match": {"make": {"$ne": None, "$exists": True}}},
+        {"$group": {
+            "_id": {"make": "$make", "model": "$model"},
+            "count": {"$sum": 1},
+        }},
+        {"$group": {
+            "_id": "$_id.make",
+            "count": {"$sum": "$count"},
+            "models": {"$push": {"model": "$_id.model", "count": "$count"}},
+        }},
+        {"$sort": {"count": -1, "_id": 1}},
+    ]
+    items = []
+    async for d in svc.db.auto_vehicles.aggregate(pipeline):
+        models = sorted(
+            [m for m in d["models"] if m.get("model")],
+            key=lambda x: (-x["count"], x["model"]),
+        )
+        items.append({"make": d["_id"], "count": d["count"], "models": models})
+    return {"items": items}
+
+
+# =============================================================================
+# Admin: app settings — editable API keys / integrations
+# =============================================================================
+
+@router.get("/admin/settings")
+async def admin_get_settings(
+    _: Dict[str, Any] = Depends(require_admin),
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Return the schema + current values (secrets masked)."""
+    from services.auto_settings_service import list_for_admin
+    return await list_for_admin(svc.db)
+
+
+@router.put("/admin/settings")
+async def admin_update_settings(
+    payload: Dict[str, Any] = Body(...),
+    _: Dict[str, Any] = Depends(require_admin),
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Partial-update settings. Empty/masked secret fields are preserved."""
+    from services.auto_settings_service import update_settings
+    return await update_settings(svc.db, payload or {})

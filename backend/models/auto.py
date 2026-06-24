@@ -347,3 +347,63 @@ class HighestBidResponse(BaseModel):
 
 class StripeDepositRequest(BaseModel):
     origin_url: str
+
+
+# =============================================================================
+# Email campaigns — daily auto-generated digests (2/day, ≤5 vehicles each)
+# =============================================================================
+
+class AutoCampaignStatus(str, Enum):
+    DRAFT = "draft"           # AI-generated, awaiting admin review
+    APPROVED = "approved"     # admin approved, queued for send
+    SENDING = "sending"       # provider job in progress
+    SENT = "sent"             # delivered (provider acknowledged)
+    FAILED = "failed"
+
+
+class AutoCampaignVehicleSnap(BaseModel):
+    """Small frozen snapshot of the vehicle at campaign-creation time so
+    the email content is reproducible even if the lot disappears later."""
+    vehicle_id: str
+    title_ru: str
+    year: Optional[int] = None
+    make: Optional[str] = None
+    model: Optional[str] = None
+    mileage_km: Optional[int] = None
+    location: Optional[str] = None
+    current_price_nzd: Optional[float] = None
+    display_price_rub: Optional[float] = None
+    image_url: Optional[str] = None
+    source: Optional[str] = None
+    listing_type: Optional[str] = None
+    detail_url: Optional[str] = None
+    ai_blurb_ru: Optional[str] = None   # 1–2 sentence Russian marketing copy
+
+
+class AutoEmailCampaign(BaseModel):
+    id: str = Field(default_factory=_uuid)
+    slot: str                              # "morning" | "evening"
+    subject_ru: str
+    intro_ru: str                          # 1-paragraph AI intro
+    footer_ru: Optional[str] = None
+    vehicles: List[AutoCampaignVehicleSnap] = []
+    status: AutoCampaignStatus = AutoCampaignStatus.DRAFT
+    recipient_count: int = 0
+    recipients_sample: List[str] = []       # first 5 emails for admin preview
+    scheduled_at: Optional[datetime] = None
+    sent_at: Optional[datetime] = None
+    sent_message_ids: List[str] = []
+    provider: Optional[str] = None          # "sendsay" | "mailchimp" | "stub"
+    error: Optional[str] = None
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class AutoEmailUnsubscribe(BaseModel):
+    id: str = Field(default_factory=_uuid)
+    email: str
+    user_id: Optional[str] = None
+    token: str                              # one-time-style HMAC token
+    campaign_id: Optional[str] = None
+    reason: Optional[str] = None
+    created_at: datetime = Field(default_factory=_utcnow)

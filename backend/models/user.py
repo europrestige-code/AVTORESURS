@@ -76,6 +76,9 @@ class CustomerInfo(BaseModel):
     city: Optional[str] = None
     country: str = "Russia"
     preferred_payment_method: Optional[str] = None
+    # AvtoResurs marketing rules: opt-IN by default; opt-OUT via the
+    # unsubscribe link in every email (also exposed in the customer dashboard).
+    marketing_consent: bool = True
 
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))

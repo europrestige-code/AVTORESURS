@@ -7,16 +7,17 @@ to the export container port in Auckland. The cost depends on:
   • whether the vehicle is a runner (drives) or non-runner (must be towed),
   • per-job surcharges (forklift, etc.) handled elsewhere.
 
-Pricing baseline: indicative PTS Vehicle Logistics / Carstars-style NZ
-transport rates as of 2026. Operators should periodically calibrate these
-values; they are designed to be conservative for the client (slight
-over-estimate) so the final invoice never surprises.
+Pricing baseline: PTS Vehicle Logistics / Conroy-style NZ rates per
+operator specification (2026):
+    Auckland / immediate suburbs ... NZ$0
+    ~1 hour from Auckland ......... NZ$250  (Hamilton, Whangarei)
+    ~6 hours from Auckland ........ NZ$750  (Palmerston North area)
+    Wellington → Auckland ......... NZ$790
+    Christchurch (incl. ferry) .... NZ$1,100
+    further South Island adds ~NZ$200 per leg.
 
 NON-RUNNER rule (per product spec):
-  cost_non_runner = 2 × cost_runner
-
-The default "local_transport_nzd" of NZ$500 in pricing.calculate_price_breakdown
-is used only when no branch is known.
+    cost_non_runner = 2 × cost_runner
 """
 
 from __future__ import annotations
@@ -24,9 +25,9 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 # Base "runner" delivery cost to Auckland port (NZD).
-# Auckland-area branches: $0 (already at the port).
+# Calibrated to PTS-style pricing as of 2026.
 RUNNER_TRANSPORT_NZD: Dict[str, float] = {
-    # Auckland & immediate suburbs
+    # Auckland & immediate suburbs (already at port)
     "auckland": 0.0,
     "otahuhu": 0.0,
     "north shore": 0.0,
@@ -37,48 +38,50 @@ RUNNER_TRANSPORT_NZD: Dict[str, float] = {
     "penrose - great south road": 0.0,
     "manukau city": 0.0,
 
-    # Northland
-    "whangarei": 220.0,
+    # Northland (~2h)
+    "whangarei": 300.0,
 
-    # Waikato
-    "hamilton": 220.0,
-    "avalon drive": 220.0,
-    "te rapa road": 220.0,
-    "hamilton avalon cars": 220.0,
+    # Waikato (~1.5h)
+    "hamilton": 250.0,
+    "avalon drive": 250.0,
+    "te rapa road": 250.0,
+    "hamilton avalon cars": 250.0,
 
-    # Bay of Plenty
-    "tauranga": 280.0,
-    "rotorua": 320.0,
+    # Bay of Plenty (~3h)
+    "tauranga": 400.0,
+    "rotorua": 450.0,
 
-    # Hawke's Bay
-    "napier": 420.0,
-    "hastings": 430.0,
+    # Hawke's Bay (~5h)
+    "napier": 650.0,
+    "hastings": 660.0,
 
-    # Taranaki
-    "new plymouth": 520.0,
+    # Taranaki (~4.5h)
+    "new plymouth": 600.0,
 
-    # Manawatu / Wellington
-    "palmerston north": 540.0,
-    "porirua": 650.0,
-    "wellington": 680.0,
-    "wellington - porirua": 650.0,
+    # Manawatu (~7h)
+    "palmerston north": 750.0,
 
-    # Top of South Island
+    # Wellington (~8h, ferry-staging hub)
+    "porirua": 770.0,
+    "wellington": 790.0,
+    "wellington - porirua": 770.0,
+
+    # Top of South Island (Wellington + ferry)
     "nelson": 1050.0,
-    "blenheim": 1100.0,
+    "blenheim": 1090.0,
 
-    # Canterbury
-    "christchurch": 1250.0,
-    "hornby": 1250.0,
-    "moorhouse ave": 1250.0,
-    "wairakei rd": 1250.0,
-    "wairakei road": 1250.0,
-    "timaru": 1450.0,
+    # Canterbury (incl. ferry crossing)
+    "christchurch": 1100.0,
+    "hornby": 1100.0,
+    "moorhouse ave": 1100.0,
+    "wairakei rd": 1100.0,
+    "wairakei road": 1100.0,
+    "timaru": 1250.0,
 
     # Otago / Southland
-    "dunedin": 1650.0,
-    "invercargill": 1950.0,
-    "queenstown": 1800.0,
+    "dunedin": 1450.0,
+    "invercargill": 1700.0,
+    "queenstown": 1550.0,
 }
 
 
