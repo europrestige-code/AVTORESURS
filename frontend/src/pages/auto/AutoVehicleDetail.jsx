@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import BidPanel from "../../components/auto/BidPanel";
 import PriceBreakdown from "../../components/auto/PriceBreakdown";
 import CountdownTimer from "../../components/auto/CountdownTimer";
+import SimilarLots from "../../components/auto/SimilarLots";
 import { fmtPrice, fmtKm, fmtDate, LISTING_LABEL } from "../../components/auto/VehicleCard";
 import { getFxRate, formatRub } from "../../services/autoCurrency";
 
@@ -253,6 +254,8 @@ export default function AutoVehicleDetail() {
           )}
         </div>
       </div>
+
+      <SimilarLots vehicleId={id} />
       <style>{`
         @media (max-width: 900px) {
           .vehicle-grid { grid-template-columns: 1fr !important; }

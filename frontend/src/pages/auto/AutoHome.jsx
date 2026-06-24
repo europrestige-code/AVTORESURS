@@ -16,6 +16,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import autoApi from "../../services/autoApi";
+import BodyTypeStrip from "../../components/auto/BodyTypeStrip";
 import { getFxRate, formatRub } from "../../services/autoCurrency";
 
 /* ==========================================================================
@@ -167,6 +168,10 @@ export default function AutoHome() {
     <main className="auto-home-v2 -mx-4 lg:-mx-6 bg-[#05070B] text-white" data-testid="auto-home">
       <Hero onView={() => navigate("/auto/catalog")} />
       <SearchPanel total={totals.total} onSubmit={() => navigate("/auto/catalog")} />
+
+      <section className="mx-auto max-w-7xl px-6 pt-6" data-testid="body-type-strip-section">
+        <BodyTypeStrip />
+      </section>
 
       <HotDaily />
 

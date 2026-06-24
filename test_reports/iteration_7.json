@@ -1,0 +1,36 @@
+{
+  "summary": "Iter7 — Body-type filter strip (8 SVG chips) and SimilarLots widget verified end-to-end. Backend pytest 17/17 PASS (body-type-counts canonical order + total, alias regex filter for sedan/suv/utility/hatchback/wagon/van, /vehicles/{id}/similar happy-path + 404 + no-500-on-no-matches; regression: admin login, make filter, hot-daily, deposit, admin settings, AI chat). Frontend: /auto strip visible just under hero+SearchPanel with 8 chips (Кабриолет/Универсал/Пикап/Купе/Хэтчбек/Фургон/Седан/Внедорожник) showing dynamic counts (Седан 4, Хэтчбек 3, Пикап 2, Универсал 1, Фургон 1, Кроссовер 1, others 0). Clicking Sedan navigates to /auto/catalog?body_type=sedan. /auto/catalog strip click toggles URL param body_type=suv and aria-selected=true with blue active styling; second click removes the filter. Toyota vehicle 1f49c4c5… renders [data-testid=similar-lots] with 2 [data-testid^=similar-card-] cards and a 'Весь каталог →' link to /auto/catalog. Single-make vehicle (Lexus 9a7174a2…) renders no SimilarLots (component returns null) and page still loads normally with header + breakdown + RUB total. No console errors observed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_body_types_similar.py",
+    "/app/test_reports/pytest/iter7.xml"
+  ],
+  "action_items": [
+    "(carried) Fix iter5/6 services/auto_ru_customs_service.suggest_defaults_for_listing — damaged vehicle still returns is_non_runner=False (not retested this iter but unchanged in code).",
+    "(carried) auto_routes.py is now 1552 lines (>700) — consider splitting into sub-routers (public catalog / similar+body-types / admin-vehicles / admin-sources / admin-stripe / chat)."
+  ],
+  "critical_code_review_comments": [
+    "auto_body_types.counts_by_canonical iterates 8 keys with sequential count_documents (8 round-trips) — fine at this DB size but consider a single aggregation with $regex $switch for scale.",
+    "/vehicles/{id}/similar over-fetches limit*3 then re-sorts in Python; acceptable for limit=4 but flag if limit grows.",
+    "auto_routes.py file size 1552 lines — exceeds 700-line guideline, refactor recommended.",
+    "BodyTypeStrip skeleton renders 8 grey placeholders even on empty error response (items=[]) — could show a one-line error instead of permanent skeleton."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter7_body_types_similar.py (NEW)"
+  ],
+  "success_rate": {"backend": "100% (17/17 pytest)", "frontend": "100% — all 4 frontend acceptance criteria pass"},
+  "test_credentials": "admin@buyanywhere.com / admin12345; client@buyanywhere.com / client12345",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter7 body-type strip & SimilarLots fully verified. Sedan filter currently matches 4 vehicles, SUV matches 1, Hatchback 3, Utility 2, Van 1, Wagon 1 — matches spec. Toyota id 1f49c4c5-4f6a-44d8-a1fa-d6ff43579a88 has 2 similar Toyotas (Hiace 2.7L 2013, Aqua S Hybrid 2017). Single-make Lexus/Holden/BMW/Nissan/Mazda ids return empty similar list and FE correctly renders nothing. Open iter6 regression (landed-defaults damaged dispatch) was NOT re-tested in this iteration — main agent should still address it.",
+  "rca of the issue": "N/A — no new issues found in iter7 scope."
+}

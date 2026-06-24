@@ -37,14 +37,14 @@ export default function AutoLayout() {
             <img
               src="/branding/avtoresurs-mark.png"
               alt="АвтоРесурс"
-              className="h-[120px] w-[140px] rounded-xl object-cover bg-blue-600"
+              className="h-16 w-16 rounded-xl object-cover bg-blue-600"
             />
-            <div>
-              <div className="text-lg font-black italic tracking-wide leading-none">
+            <div className="flex flex-col justify-center" style={{ height: "64px" }}>
+              <div className="text-3xl font-black italic tracking-wide leading-none">
                 <span className="text-white">АВТО</span>
                 <span className="text-blue-500">РЕСУРС</span>
               </div>
-              <div className="mt-1 text-[10px] uppercase tracking-[0.25em] text-gray-400">
+              <div className="mt-2 text-[10px] uppercase tracking-[0.25em] text-gray-400">
                 автомобили со всего мира
               </div>
             </div>
@@ -83,11 +83,11 @@ export default function AutoLayout() {
               </>
             ) : (
               <>
-                <NavLink to="/" className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10" data-testid="nav-login">
-                  <User className="mr-2 inline h-4 w-4" />
+                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 h-10 text-sm font-medium hover:bg-white/10 transition" data-testid="nav-login">
+                  <User className="mr-2 h-4 w-4" />
                   Войти
                 </NavLink>
-                <NavLink to="/" className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500" data-testid="nav-register">
+                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 h-10 text-sm font-semibold text-white hover:bg-blue-500 transition" data-testid="nav-register">
                   Зарегистрироваться
                 </NavLink>
               </>

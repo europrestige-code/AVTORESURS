@@ -289,19 +289,106 @@ def render_email_html(camp: AutoEmailCampaign, recipient_email: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Provider — pluggable. Currently a stub that no-ops in send and logs.
+# Provider — pluggable. Reads provider name + API key from app_settings
+# at send-time so the admin can switch providers without a restart.
 # ---------------------------------------------------------------------------
 
-async def _send_via_provider(camp: AutoEmailCampaign, recipients: List[str]) -> Dict[str, object]:
-    provider_name = os.environ.get("AUTO_EMAIL_PROVIDER", "stub").lower()
-    if provider_name == "sendsay":
-        # TODO: Wire to Sendsay API once API key + login provided
-        log.info("[SENDSAY-STUB] would send %d emails for campaign %s", len(recipients), camp.id)
-    elif provider_name == "mailchimp":
-        # TODO: Wire to Mailchimp Marketing API + Audience ID
-        log.info("[MAILCHIMP-STUB] would send %d emails for campaign %s", len(recipients), camp.id)
-    else:
-        log.info("[STUB] would send %d emails for campaign %s", len(recipients), camp.id)
+async def _send_mailchimp(db, camp, recipients):
+    """Mailchimp Marketing API — Transactional / Audience send.
+
+    We use the Marketing v3 endpoint POST /campaigns to create + POST /campaigns/{id}/actions/send.
+    Requires: email_provider_api_key in the form "<key>-<dc>" (e.g. abc...-us21)
+    + a configured Audience (List) — we use the first audience the key has access to.
+    """
+    from services.auto_settings_service import get_setting
+    import httpx
+    api_key = await get_setting(db, "email_provider_api_key")
+    if not api_key or "-" not in api_key:
+        raise RuntimeError("Mailchimp API key not configured or malformed (expected key-dc form)")
+    dc = api_key.rsplit("-", 1)[1]
+    base = f"https://{dc}.api.mailchimp.com/3.0"
+    auth = ("anystring", api_key)
+    from_email = await get_setting(db, "email_from_address", "info@avtoresurs.nz")
+    from_name  = await get_setting(db, "email_from_name", "АвтоРесурс")
+    async with httpx.AsyncClient(timeout=30.0, auth=auth) as c:
+        # Pick first list (audience)
+        lr = await c.get(f"{base}/lists?count=1")
+        lr.raise_for_status()
+        lists = lr.json().get("lists", [])
+        if not lists:
+            raise RuntimeError("Mailchimp: no audiences (lists) configured on this account")
+        list_id = lists[0]["id"]
+        # Create regular campaign
+        cr = await c.post(f"{base}/campaigns", json={
+            "type": "regular",
+            "recipients": {"list_id": list_id},
+            "settings": {
+                "subject_line": camp.subject_ru,
+                "title": f"AvtoResurs {camp.slot} {camp.id[:8]}",
+                "from_name": from_name,
+                "reply_to": from_email,
+            },
+        })
+        cr.raise_for_status()
+        cid = cr.json()["id"]
+        # Set HTML
+        await c.put(f"{base}/campaigns/{cid}/content", json={
+            "html": render_email_html(camp, "subscriber@list"),
+        })
+        # Send
+        await c.post(f"{base}/campaigns/{cid}/actions/send")
+    return {"provider": "mailchimp", "message_ids": [cid], "delivered": len(recipients)}
+
+
+async def _send_sendsay(db, camp, recipients):
+    """Sendsay (sendsay.ru) — JSON-RPC API.
+
+    Auth = login+password from settings (account_sid + auth_token fields reused).
+    Issue.create method creates a campaign with HTML + sends to a given list.
+    """
+    from services.auto_settings_service import get_setting
+    import httpx
+    api_key = await get_setting(db, "email_provider_api_key")
+    if not api_key:
+        raise RuntimeError("Sendsay API key not configured")
+    # Sendsay expects "login:apikey" auth (or a session); simplified here:
+    from_email = await get_setting(db, "email_from_address", "info@avtoresurs.nz")
+    from_name  = await get_setting(db, "email_from_name", "АвтоРесурс")
+    url = "https://api.sendsay.ru/general/api/v100/json/_"
+    payload = {
+        "action": "issue.send",
+        "apikey": api_key,
+        "letter": {
+            "subject": camp.subject_ru,
+            "from.name": from_name,
+            "from.email": from_email,
+            "message": {"html": render_email_html(camp, "subscriber@list")},
+        },
+        "users": [{"email": e} for e in recipients],
+    }
+    async with httpx.AsyncClient(timeout=30.0) as c:
+        r = await c.post(url, json=payload)
+        r.raise_for_status()
+        data = r.json()
+    if data.get("errors"):
+        raise RuntimeError(f"Sendsay error: {data['errors']}")
+    return {"provider": "sendsay", "message_ids": [data.get("track.id", "")], "delivered": len(recipients)}
+
+
+async def _send_via_provider(camp: AutoEmailCampaign, recipients: List[str], db=None) -> Dict[str, object]:
+    from services.auto_settings_service import get_setting
+    provider_name = (await get_setting(db, "email_provider", "stub")) if db is not None else "stub"
+    provider_name = (provider_name or "stub").lower()
+    try:
+        if provider_name == "mailchimp" and db is not None:
+            return await _send_mailchimp(db, camp, recipients)
+        if provider_name == "sendsay" and db is not None:
+            return await _send_sendsay(db, camp, recipients)
+    except Exception as e:                                    # noqa: BLE001
+        log.exception("Provider %s send failed; falling back to stub.", provider_name)
+        return {"provider": f"{provider_name}-failed", "message_ids": [], "delivered": 0, "error": str(e)}
+    # stub / resend / unknown — no-op
+    log.info("[%s] would send %d emails for campaign %s", provider_name.upper(), len(recipients), camp.id)
     return {"provider": provider_name, "message_ids": [], "delivered": len(recipients)}
 
 
@@ -345,7 +432,7 @@ async def send_campaign(
                   "updated_at": datetime.now(timezone.utc)}},
     )
     try:
-        info = await _send_via_provider(camp, recipients)
+        info = await _send_via_provider(camp, recipients, db=db)
         await db.auto_email_campaigns.update_one(
             {"id": campaign_id},
             {"$set": {

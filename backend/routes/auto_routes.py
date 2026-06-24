@@ -683,6 +683,18 @@ async def admin_backfill_branding(
     }
 
 
+@router.get("/body-type-counts")
+async def body_type_counts(svc: AutoService = Depends(get_auto_service)):
+    """Counts per canonical body type (Sedan, SUV, Wagon, …) for the filter strip.
+
+    Each canonical key collapses many alias spellings stored across NZ/AU
+    sources and Russian-translated entries.
+    """
+    from services.auto_body_types import counts_by_canonical
+    items = await counts_by_canonical(svc.db)
+    return {"items": items, "total": sum(i["count"] for i in items)}
+
+
 @router.get("/catalog-summary")
 async def catalog_summary(svc: AutoService = Depends(get_auto_service)):
     """Counts for the catalog hero (Turners-style): total + by body_type + by listing_type + makes."""
@@ -1478,3 +1490,62 @@ async def admin_update_settings(
     """Partial-update settings. Empty/masked secret fields are preserved."""
     from services.auto_settings_service import update_settings
     return await update_settings(svc.db, payload or {})
+
+
+@router.get("/vehicles/{vehicle_id}/similar")
+async def vehicles_similar(
+    vehicle_id: str,
+    limit: int = 4,
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Return up to `limit` similar available vehicles to the given one.
+
+    Similarity = same make, model overlap (>=1 token shared), year within ±3,
+    excluding self. Falls back to same-make-only if there aren't enough exact
+    matches.
+    """
+    v = await svc.db.auto_vehicles.find_one({"id": vehicle_id}, {"_id": 0})
+    if not v:
+        raise HTTPException(404, "Not found")
+    make = v.get("make")
+    if not make:
+        return {"items": []}
+    base_q: Dict[str, Any] = {
+        "id": {"$ne": vehicle_id},
+        "status": "available",
+        "make": {"$regex": f"^{make}$", "$options": "i"},
+    }
+    year = v.get("year")
+    if year:
+        base_q["year"] = {"$gte": year - 3, "$lte": year + 3}
+
+    # First: same make + year window + (model token overlap, soft)
+    model = (v.get("model") or "").split()
+    cursor = svc.db.auto_vehicles.find(base_q, {"_id": 0}).limit(int(limit) * 3)
+    pool = [d async for d in cursor]
+    # rank
+    def score(d):
+        s = 0
+        if model and d.get("model"):
+            dm = d["model"].split()
+            s += 5 * len(set(t.lower() for t in dm) & set(t.lower() for t in model))
+        if year and d.get("year"):
+            s += max(0, 3 - abs(year - d["year"]))
+        if d.get("listing_type") == v.get("listing_type"):
+            s += 1
+        return -s
+    pool.sort(key=score)
+    items = pool[: int(limit)]
+    if len(items) < int(limit):
+        # backfill from same make only
+        seen = {x["id"] for x in items}
+        cursor2 = svc.db.auto_vehicles.find(
+            {"make": base_q["make"], "status": "available", "id": {"$ne": vehicle_id}},
+            {"_id": 0},
+        ).limit(int(limit) * 2)
+        async for d in cursor2:
+            if d["id"] in seen: continue
+            items.append(d)
+            seen.add(d["id"])
+            if len(items) >= int(limit): break
+    return {"items": items[: int(limit)]}

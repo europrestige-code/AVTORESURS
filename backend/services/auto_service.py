@@ -193,10 +193,19 @@ class AutoService:
         else:
             query["status"] = {"$ne": AutoVehicleStatus.HIDDEN.value}
 
-        for key in ("country", "source", "make", "model", "listing_type", "condition", "damage_type", "body_type"):
+        for key in ("country", "source", "make", "model", "listing_type", "condition", "damage_type"):
             val = filters.get(key)
             if val:
                 query[key] = val
+
+        # body_type supports canonical English keys (sedan, suv, wagon, ...) that
+        # match across EN/RU aliases stored in the DB. Anything else is treated
+        # as an exact value (legacy behaviour).
+        bt = filters.get("body_type")
+        if bt:
+            from services.auto_body_types import mongo_filter_for_key
+            mf = mongo_filter_for_key(bt)
+            query["body_type"] = mf if mf else bt
 
         if filters.get("year_from") or filters.get("year_to"):
             year_q: Dict[str, Any] = {}
