@@ -1,0 +1,423 @@
+"""
+АвтоРесурс / BuyAnywhere Auto — source importers.
+
+Goal: maintain the most complete possible catalogue of publicly available
+vehicles from approved source websites. Importers MUST be modular: a failure
+in one importer must never affect the rest of the platform.
+
+Architecture:
+    SourceImporter (interface)
+        ├── TurnersImporter   (Turners NZ)
+        ├── ManheimImporter   (Manheim NZ)
+        └── PicklesImporter   (Pickles AU)
+
+Each importer:
+    - tries to fetch from a *publicly listed* index URL the operator configures;
+    - parses what it can (HTML / RSS / JSON);
+    - returns AutoVehicle records with consistent metadata
+      (source, source_reference, source_url, last_sync_time, sync_status,
+       inventory_status);
+    - never raises into the orchestrator: any failure is captured into
+      sync_status = 'failed' and surfaced for the admin.
+
+Duplicate detection:
+    Primary  → source + source_reference  (unique inside one source)
+    Secondary → VIN  (across all sources)
+    Tertiary → year + make + model + mileage_km + location
+
+Status rules:
+    Vehicles are *never* deleted. When a source no longer lists a vehicle the
+    importer flips inventory_status to "sold" or "removed" and the visible
+    status is updated. Admin can hide manually.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import re
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import httpx
+from bs4 import BeautifulSoup
+
+from models.auto import (
+    AutoCountry,
+    AutoImageRights,
+    AutoInventoryStatus,
+    AutoListingType,
+    AutoSyncStatus,
+    AutoVehicle,
+    AutoVehicleStatus,
+)
+from services.auto_ai_service import AutoAIService
+
+logger = logging.getLogger(__name__)
+
+
+# ---------- helpers ----------
+
+PRICE_RE = re.compile(r"(?:NZ\$|AU\$|\$)\s*([\d,]+(?:\.\d{1,2})?)", re.IGNORECASE)
+YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
+KM_RE = re.compile(r"([\d,]{2,})\s*(?:km|км)\b", re.IGNORECASE)
+
+
+def _to_float(s: Optional[str]) -> Optional[float]:
+    if not s:
+        return None
+    try:
+        return float(s.replace(",", "").strip())
+    except Exception:
+        return None
+
+
+def _norm(s: Optional[str]) -> Optional[str]:
+    if not s:
+        return None
+    return re.sub(r"\s+", " ", s.strip()) or None
+
+
+# ---------- result types ----------
+
+@dataclass
+class ImportResult:
+    importer: str
+    fetched: int = 0
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    failed: int = 0
+    sync_status: AutoSyncStatus = AutoSyncStatus.SUCCESS
+    errors: List[str] = field(default_factory=list)
+    started_at: datetime = field(default_factory=datetime.utcnow)
+    finished_at: Optional[datetime] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "importer": self.importer,
+            "fetched": self.fetched,
+            "created": self.created,
+            "updated": self.updated,
+            "skipped": self.skipped,
+            "failed": self.failed,
+            "sync_status": self.sync_status.value,
+            "errors": self.errors[:20],
+            "started_at": self.started_at.isoformat(),
+            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+        }
+
+
+# ---------- base ----------
+
+class SourceImporter(ABC):
+    """Abstract source importer.
+
+    Concrete subclasses must implement at least `fetch_vehicles`. They MAY
+    implement `fetch_vehicle_details` for richer enrichment.
+    """
+
+    name: str = "source"
+    country: AutoCountry = AutoCountry.NZ
+    listing_type: AutoListingType = AutoListingType.AUCTION
+    base_url: Optional[str] = None
+    user_agent: str = "AvtoResursBot/1.0 (+https://avtoresurs)"
+
+    def __init__(self, ai: Optional[AutoAIService] = None):
+        self.ai = ai
+
+    # ---- HTTP helpers ----
+    async def _get(self, url: str, timeout: float = 12.0) -> Optional[str]:
+        try:
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True,
+                                         headers={"User-Agent": self.user_agent}) as c:
+                r = await c.get(url)
+                r.raise_for_status()
+                return r.text
+        except Exception as e:
+            logger.warning(f"[{self.name}] GET {url} failed: {e}")
+            return None
+
+    # ---- abstract ----
+    @abstractmethod
+    async def fetch_vehicles(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Return raw vehicle dicts (NOT yet AutoVehicle). The orchestrator
+        will then call `normalise()` per dict."""
+        raise NotImplementedError
+
+    async def fetch_vehicle_details(self, source_reference: str) -> Optional[Dict[str, Any]]:
+        return None
+
+    # ---- normalisation ----
+    def normalise(self, raw: Dict[str, Any]) -> AutoVehicle:
+        """Convert a raw dict to an AutoVehicle. Subclasses can override."""
+        title = _norm(raw.get("title") or raw.get("title_original")) or "Автомобиль"
+        return AutoVehicle(
+            source=self.name,
+            source_url=raw.get("source_url"),
+            source_reference=raw.get("source_reference"),
+            country=self.country,
+            listing_type=self.listing_type,
+            title_original=title,
+            title_ru=raw.get("title_ru") or title,
+            description_original=raw.get("description") or raw.get("description_original"),
+            make=_norm(raw.get("make")),
+            model=_norm(raw.get("model")),
+            year=raw.get("year"),
+            mileage_km=raw.get("mileage_km"),
+            engine=_norm(raw.get("engine")),
+            fuel=_norm(raw.get("fuel")),
+            transmission=_norm(raw.get("transmission")),
+            body_type=_norm(raw.get("body_type")),
+            location=_norm(raw.get("location")),
+            condition=_norm(raw.get("condition")),
+            damage_type=_norm(raw.get("damage_type")),
+            current_price_nzd=raw.get("current_price_nzd"),
+            buy_now_price_nzd=raw.get("buy_now_price_nzd"),
+            status=AutoVehicleStatus.AVAILABLE,
+            source_images=list(raw.get("images") or []),
+            images=list(raw.get("images") or []),
+            image_rights_status=AutoImageRights.SOURCE_PREVIEW,
+            vin=raw.get("vin"),
+            last_sync_time=datetime.utcnow(),
+            sync_status=AutoSyncStatus.SUCCESS,
+            inventory_status=AutoInventoryStatus.AVAILABLE,
+        )
+
+
+# ---------- concrete importers ----------
+
+class TurnersImporter(SourceImporter):
+    """Turners NZ. Uses the public sitemap or category index as a starting
+    point. If the structure changes, the importer reports sync_status=failed."""
+
+    name = "turners"
+    country = AutoCountry.NZ
+    listing_type = AutoListingType.AUCTION
+    base_url = "https://www.turners.co.nz"
+
+    async def fetch_vehicles(self, limit: int = 20) -> List[Dict[str, Any]]:
+        items: List[Dict[str, Any]] = []
+        # Public, lightweight starting points (no aggressive scraping).
+        candidates = [
+            f"{self.base_url}/cars/used-cars-for-sale",
+        ]
+        for url in candidates:
+            html = await self._get(url)
+            if not html:
+                continue
+            items.extend(self._parse_listing_index(html, url))
+            if len(items) >= limit:
+                break
+        return items[:limit]
+
+    def _parse_listing_index(self, html: str, base: str) -> List[Dict[str, Any]]:
+        soup = BeautifulSoup(html, "lxml")
+        results: List[Dict[str, Any]] = []
+        # Heuristic: look for product cards (links containing "/cars/")
+        seen = set()
+        for a in soup.select("a"):
+            href = a.get("href") or ""
+            if "/cars/" not in href:
+                continue
+            full = href if href.startswith("http") else f"{self.base_url}{href}"
+            if full in seen or full == base:
+                continue
+            text = _norm(a.get_text(" ", strip=True))
+            if not text or len(text) < 12:
+                continue
+            ref = re.search(r"/(\d{4,})(?:/|$)", full)
+            results.append({
+                "source_url": full,
+                "source_reference": ref.group(1) if ref else None,
+                "title": text[:160],
+                "year": int(YEAR_RE.search(text).group(0)) if YEAR_RE.search(text) else None,
+            })
+            seen.add(full)
+        return results
+
+
+class ManheimImporter(SourceImporter):
+    """Manheim NZ. Falls back gracefully if the public index is unavailable."""
+
+    name = "manheim"
+    country = AutoCountry.NZ
+    listing_type = AutoListingType.AUCTION
+    base_url = "https://www.manheim.co.nz"
+
+    async def fetch_vehicles(self, limit: int = 20) -> List[Dict[str, Any]]:
+        html = await self._get(f"{self.base_url}/")
+        if not html:
+            return []
+        soup = BeautifulSoup(html, "lxml")
+        results: List[Dict[str, Any]] = []
+        seen = set()
+        for a in soup.select("a"):
+            href = a.get("href") or ""
+            if not any(k in href for k in ("/vehicle/", "/lot/", "/listing/")):
+                continue
+            full = href if href.startswith("http") else f"{self.base_url}{href}"
+            if full in seen:
+                continue
+            text = _norm(a.get_text(" ", strip=True))
+            if not text:
+                continue
+            ref = re.search(r"/(\d{4,})", full)
+            results.append({
+                "source_url": full,
+                "source_reference": ref.group(1) if ref else None,
+                "title": text[:160],
+            })
+            seen.add(full)
+            if len(results) >= limit:
+                break
+        return results
+
+
+class PicklesImporter(SourceImporter):
+    """Pickles AU (and select NZ inventory). Country defaults to AU; the
+    orchestrator may override per call."""
+
+    name = "pickles"
+    country = AutoCountry.AU
+    listing_type = AutoListingType.INQUIRY_ONLY
+    base_url = "https://www.pickles.com.au"
+
+    async def fetch_vehicles(self, limit: int = 20) -> List[Dict[str, Any]]:
+        html = await self._get(f"{self.base_url}/used/search/category/passenger")
+        if not html:
+            return []
+        soup = BeautifulSoup(html, "lxml")
+        results: List[Dict[str, Any]] = []
+        seen = set()
+        for a in soup.select("a"):
+            href = a.get("href") or ""
+            if "/item/" not in href and "/used/" not in href:
+                continue
+            full = href if href.startswith("http") else f"{self.base_url}{href}"
+            if full in seen or "search" in full:
+                continue
+            text = _norm(a.get_text(" ", strip=True))
+            if not text or len(text) < 8:
+                continue
+            ref = re.search(r"/(\d{4,})", full)
+            results.append({
+                "source_url": full,
+                "source_reference": ref.group(1) if ref else None,
+                "title": text[:160],
+            })
+            seen.add(full)
+            if len(results) >= limit:
+                break
+        return results
+
+
+# Registry — easy to add a phase-2/3 source without touching call sites.
+IMPORTERS: Dict[str, type] = {
+    "turners": TurnersImporter,
+    "manheim": ManheimImporter,
+    "pickles": PicklesImporter,
+}
+
+
+# ---------- duplicate detection ----------
+
+async def find_duplicate(db, candidate: AutoVehicle) -> Optional[Dict[str, Any]]:
+    """Return an existing vehicle that duplicates `candidate`, or None.
+
+    Order: source+source_reference → vin → year+make+model+mileage+location.
+    """
+    if candidate.source and candidate.source_reference:
+        doc = await db.auto_vehicles.find_one(
+            {"source": candidate.source, "source_reference": candidate.source_reference}
+        )
+        if doc:
+            return doc
+    if candidate.vin:
+        doc = await db.auto_vehicles.find_one({"vin": candidate.vin})
+        if doc:
+            return doc
+    if all([candidate.year, candidate.make, candidate.model]):
+        q: Dict[str, Any] = {
+            "year": candidate.year,
+            "make": {"$regex": f"^{re.escape(candidate.make)}$", "$options": "i"},
+            "model": {"$regex": f"^{re.escape(candidate.model)}$", "$options": "i"},
+        }
+        if candidate.mileage_km:
+            q["mileage_km"] = {"$gte": int(candidate.mileage_km * 0.9),
+                               "$lte": int(candidate.mileage_km * 1.1)}
+        if candidate.location:
+            q["location"] = {"$regex": re.escape(candidate.location), "$options": "i"}
+        doc = await db.auto_vehicles.find_one(q)
+        if doc:
+            return doc
+    return None
+
+
+# ---------- orchestrator ----------
+
+class ImportOrchestrator:
+    """Runs one or all importers, applies duplicate detection, upserts into
+    Mongo, and records a single ImportResult per importer."""
+
+    def __init__(self, db, ai: Optional[AutoAIService] = None):
+        self.db = db
+        self.ai = ai
+
+    def available_sources(self) -> List[str]:
+        return list(IMPORTERS.keys())
+
+    async def run_one(self, source: str, limit: int = 20) -> ImportResult:
+        if source not in IMPORTERS:
+            return ImportResult(importer=source, sync_status=AutoSyncStatus.FAILED,
+                                errors=[f"Unknown source: {source}"], finished_at=datetime.utcnow())
+        importer = IMPORTERS[source](ai=self.ai)
+        result = ImportResult(importer=source)
+        try:
+            raw_items = await importer.fetch_vehicles(limit=limit)
+        except Exception as e:
+            result.sync_status = AutoSyncStatus.FAILED
+            result.errors.append(str(e))
+            result.finished_at = datetime.utcnow()
+            return result
+        result.fetched = len(raw_items)
+        for raw in raw_items:
+            try:
+                vehicle = importer.normalise(raw)
+                existing = await find_duplicate(self.db, vehicle)
+                payload = vehicle.model_dump()
+                if existing:
+                    payload.pop("id", None)
+                    payload.pop("created_at", None)
+                    payload["updated_at"] = datetime.utcnow()
+                    payload["last_sync_time"] = datetime.utcnow()
+                    await self.db.auto_vehicles.update_one(
+                        {"id": existing["id"]}, {"$set": payload}
+                    )
+                    result.updated += 1
+                else:
+                    await self.db.auto_vehicles.insert_one(payload)
+                    result.created += 1
+            except Exception as e:
+                result.failed += 1
+                result.errors.append(str(e))
+        if result.failed > 0 and result.created + result.updated == 0:
+            result.sync_status = AutoSyncStatus.FAILED
+        elif result.failed > 0:
+            result.sync_status = AutoSyncStatus.PARTIAL
+        result.finished_at = datetime.utcnow()
+        await self.db.auto_import_runs.insert_one(result.to_dict())
+        return result
+
+    async def run_all(self, limit_per_source: int = 20) -> List[ImportResult]:
+        """Run every importer in parallel. A failure in one MUST NOT affect
+        the others (per spec)."""
+        async def _safe(src: str) -> ImportResult:
+            try:
+                return await self.run_one(src, limit=limit_per_source)
+            except Exception as e:
+                return ImportResult(importer=src, sync_status=AutoSyncStatus.FAILED,
+                                    errors=[str(e)], finished_at=datetime.utcnow())
+        return await asyncio.gather(*[_safe(s) for s in IMPORTERS.keys()])

@@ -4,6 +4,7 @@ import autoApi from "../../services/autoApi";
 import { useAuth } from "../../contexts/AuthContext";
 import BidPanel from "../../components/auto/BidPanel";
 import PriceBreakdown from "../../components/auto/PriceBreakdown";
+import CountdownTimer from "../../components/auto/CountdownTimer";
 import { fmtPrice, fmtKm, fmtDate, LISTING_LABEL } from "../../components/auto/VehicleCard";
 
 export default function AutoVehicleDetail() {
@@ -27,6 +28,36 @@ export default function AutoVehicleDetail() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Live poll of the highest bid every 8s, so the visible amount and bid
+  // count update without a page refresh.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await autoApi.get(`/vehicles/${id}/highest-bid`);
+        if (cancelled) return;
+        setVehicle((prev) =>
+          prev
+            ? {
+                ...prev,
+                highest_bid_nzd: r.data.highest_bid_nzd,
+                bid_count: r.data.bid_count,
+                current_price_nzd: r.data.highest_bid_nzd > (prev.current_price_nzd || 0)
+                  ? r.data.highest_bid_nzd
+                  : prev.current_price_nzd,
+              }
+            : prev,
+        );
+      } catch { /* ignore polling errors */ }
+    };
+    const t = setInterval(tick, 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -148,8 +179,11 @@ export default function AutoVehicleDetail() {
               {" · "}ставок: {vehicle.bid_count || 0}
             </div>
             {vehicle.auction_end_time && (
-              <div className="auto-muted" style={{ fontSize: 13, marginTop: 4 }}>
-                Окончание: {fmtDate(vehicle.auction_end_time)}
+              <div style={{ marginTop: 10 }}>
+                <CountdownTimer target={vehicle.auction_end_time} testid="vehicle-detail-countdown" />
+                <div className="auto-muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Закрытие: {fmtDate(vehicle.auction_end_time)}
+                </div>
               </div>
             )}
             <button

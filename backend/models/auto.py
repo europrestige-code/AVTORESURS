@@ -32,6 +32,21 @@ class AutoVehicleStatus(str, Enum):
     EXPIRED = "expired"
     WON = "won"
     HIDDEN = "hidden"
+    IMPORT_ERROR = "import_error"
+
+
+class AutoSyncStatus(str, Enum):
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    PENDING = "pending"
+
+
+class AutoInventoryStatus(str, Enum):
+    AVAILABLE = "available"
+    SOLD = "sold"
+    REMOVED = "removed"
+    UNKNOWN = "unknown"
 
 
 class AutoBidStatus(str, Enum):
@@ -132,6 +147,14 @@ class AutoVehicle(BaseModel):
     status: AutoVehicleStatus = AutoVehicleStatus.AVAILABLE
     images: List[str] = Field(default_factory=list)
     image_rights_status: AutoImageRights = AutoImageRights.SOURCE_PREVIEW
+    source_images: List[str] = Field(default_factory=list)
+    local_images: List[str] = Field(default_factory=list)
+
+    vin: Optional[str] = None
+    last_sync_time: Optional[datetime] = None
+    sync_status: AutoSyncStatus = AutoSyncStatus.SUCCESS
+    inventory_status: AutoInventoryStatus = AutoInventoryStatus.AVAILABLE
+    sync_error: Optional[str] = None
 
     ai_summary_ru: Optional[str] = None
     ai_risk_summary_ru: Optional[str] = None

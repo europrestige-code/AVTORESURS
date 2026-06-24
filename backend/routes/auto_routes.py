@@ -144,6 +144,7 @@ async def list_vehicles(
     mileage_to: Optional[int] = None,
     condition: Optional[str] = None,
     damage_type: Optional[str] = None,
+    body_type: Optional[str] = None,
     listing_type: Optional[AutoListingType] = None,
     status_: Optional[AutoVehicleStatus] = Query(None, alias="status"),
     search: Optional[str] = None,
@@ -164,6 +165,7 @@ async def list_vehicles(
         "mileage_to": mileage_to,
         "condition": condition,
         "damage_type": damage_type,
+        "body_type": body_type,
         "listing_type": listing_type.value if listing_type else None,
         "status": status_.value if status_ else None,
         "search": search,
@@ -193,6 +195,49 @@ async def price_breakdown(payload: Dict[str, Any] = Body(...)):
         container_share_nzd=float(payload.get("container_share_nzd", 3333)),
         fx_rate_rub_nzd=payload.get("fx_rate_rub_nzd"),
     )
+
+
+@router.get("/catalog-summary")
+async def catalog_summary(svc: AutoService = Depends(get_auto_service)):
+    """Counts for the catalog hero (Turners-style): total + by body_type + by listing_type + makes."""
+    base = {"status": {"$ne": AutoVehicleStatus.HIDDEN.value}}
+    total = await svc.db.auto_vehicles.count_documents(base)
+
+    async def _bucket(field: str, limit: int = 50):
+        pipeline = [
+            {"$match": base},
+            {"$group": {"_id": f"${field}", "n": {"$sum": 1}}},
+            {"$match": {"_id": {"$ne": None}}},
+            {"$sort": {"n": -1}},
+            {"$limit": limit},
+        ]
+        out = []
+        async for row in svc.db.auto_vehicles.aggregate(pipeline):
+            out.append({"value": row["_id"], "count": row["n"]})
+        return out
+
+    body_types = await _bucket("body_type")
+    listing_types = await _bucket("listing_type")
+    makes = await _bucket("make", limit=200)
+    countries = await _bucket("country")
+    # distinct models grouped by make for the cascading dropdown
+    pipeline = [
+        {"$match": {"$and": [base, {"make": {"$ne": None}}, {"model": {"$ne": None}}]}},
+        {"$group": {"_id": {"make": "$make", "model": "$model"}, "n": {"$sum": 1}}},
+        {"$sort": {"n": -1}},
+    ]
+    models_by_make: Dict[str, List[Dict[str, Any]]] = {}
+    async for row in svc.db.auto_vehicles.aggregate(pipeline):
+        mk = row["_id"]["make"]; md = row["_id"]["model"]
+        models_by_make.setdefault(mk, []).append({"value": md, "count": row["n"]})
+    return {
+        "total": total,
+        "body_types": body_types,
+        "listing_types": listing_types,
+        "makes": makes,
+        "countries": countries,
+        "models_by_make": models_by_make,
+    }
 
 
 # ----- Client endpoints -----
@@ -253,9 +298,34 @@ async def deposit_upload(
     except ValueError:
         raise HTTPException(400, "Неверный метод оплаты.")
     proof_name: Optional[str] = None
-    if payment_proof_file is not None:
-        # Persist to a simple in-DB record (filename only). Storage upload is out of scope for MVP.
-        proof_name = payment_proof_file.filename
+    if payment_proof_file is not None and payment_proof_file.filename:
+        # Save to disk under /app/backend/uploads/deposits/
+        ALLOWED = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif"}
+        MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+        ext = os.path.splitext(payment_proof_file.filename)[1].lower()
+        if ext not in ALLOWED:
+            raise HTTPException(400, "Допустимы файлы: PDF, PNG, JPG, WEBP, HEIC.")
+        uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "deposits")
+        os.makedirs(uploads_dir, exist_ok=True)
+        import uuid as _uuid
+        stored_name = f"{_uuid.uuid4().hex}{ext}"
+        stored_path = os.path.join(uploads_dir, stored_name)
+        bytes_read = 0
+        with open(stored_path, "wb") as f:
+            while True:
+                chunk = await payment_proof_file.read(1024 * 1024)
+                if not chunk:
+                    break
+                bytes_read += len(chunk)
+                if bytes_read > MAX_BYTES:
+                    f.close()
+                    try:
+                        os.remove(stored_path)
+                    except OSError:
+                        pass
+                    raise HTTPException(400, "Файл слишком большой (макс. 10 МБ).")
+                f.write(chunk)
+        proof_name = stored_name
     deposit = AutoDeposit(
         user_id=user["id"],
         amount=float(amount),
@@ -266,6 +336,29 @@ async def deposit_upload(
         status=AutoDepositStatus.PENDING,
     )
     return await svc.create_deposit(deposit)
+
+
+@router.get("/deposit/{deposit_id}/proof")
+async def get_deposit_proof(
+    deposit_id: str,
+    user: Dict[str, Any] = Depends(require_user),
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Download deposit proof file. Owner or admin only."""
+    deposit = await svc.db.auto_deposits.find_one({"id": deposit_id})
+    if not deposit:
+        raise HTTPException(404, "Депозит не найден.")
+    if user["id"] != deposit["user_id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Доступ запрещён.")
+    fname = deposit.get("payment_proof_file")
+    if not fname:
+        raise HTTPException(404, "Файл подтверждения не загружен.")
+    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "deposits")
+    fpath = os.path.join(uploads_dir, fname)
+    if not os.path.exists(fpath):
+        raise HTTPException(404, "Файл не найден на диске.")
+    from fastapi.responses import FileResponse
+    return FileResponse(fpath, filename=fname)
 
 
 @router.post("/deposit/stripe/session")
@@ -689,4 +782,31 @@ async def admin_list_clients(
         d = await db.auto_deposits.find_one({"user_id": u["id"]}, sort=[("created_at", -1)])
         u["latest_deposit_status"] = (d or {}).get("status")
         items.append(u)
+    return items
+
+
+@router.post("/admin/vehicles/{vehicle_id}/mark-won")
+async def admin_mark_vehicle_won(
+    vehicle_id: str,
+    _: Dict[str, Any] = Depends(require_admin),
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Convenience action: flip vehicle to status='won' which triggers CRM linkage."""
+    updated = await svc.update_vehicle(vehicle_id, {"status": AutoVehicleStatus.WON.value})
+    crm = await svc.db.crm_orders.find_one({"auto_vehicle_id": vehicle_id})
+    if crm:
+        crm.pop("_id", None)
+    return {"vehicle": updated, "crm_order": crm}
+
+
+@router.get("/admin/crm-orders")
+async def admin_list_crm_orders(
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """List CRM orders that originated from BuyAnywhere Auto."""
+    items: List[Dict[str, Any]] = []
+    async for o in db.crm_orders.find({"source": "buyanywhere_auto"}).sort("created_at", -1):
+        o.pop("_id", None)
+        items.append(o)
     return items

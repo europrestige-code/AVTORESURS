@@ -1,16 +1,43 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import autoApi from "../../services/autoApi";
 import VehicleCard from "../../components/auto/VehicleCard";
 import VehicleFilters from "../../components/auto/VehicleFilters";
+import SearchHero from "../../components/auto/SearchHero";
 
 const LIMIT = 12;
+
+const FILTER_KEYS = [
+  "country", "source", "make", "model", "year_from", "year_to",
+  "price_from", "price_to", "mileage_from", "mileage_to",
+  "condition", "damage_type", "listing_type", "status", "search", "body_type",
+];
 
 export default function AutoCatalog() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [filters, setFilters] = useState({});
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filters, setFilters] = useState(() => {
+    const init = {};
+    FILTER_KEYS.forEach((k) => {
+      const v = searchParams.get(k);
+      if (v) init[k] = v;
+    });
+    return init;
+  });
   const [loading, setLoading] = useState(true);
+
+  // Re-sync filters when the URL changes (e.g. via SearchHero navigation)
+  useEffect(() => {
+    const next = {};
+    FILTER_KEYS.forEach((k) => {
+      const v = searchParams.get(k);
+      if (v) next[k] = v;
+    });
+    setFilters(next);
+    setOffset(0);
+  }, [searchParams]);
 
   const load = useCallback(async (currentFilters, currentOffset) => {
     setLoading(true);
@@ -36,7 +63,8 @@ export default function AutoCatalog() {
 
   return (
     <div className="auto-section">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", marginBottom: 16 }}>
+      <SearchHero variant="catalog" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", margin: "18px 0 12px" }}>
         <div>
           <h1 style={{ fontSize: 28, margin: 0 }}>Каталог автомобилей</h1>
           <div className="auto-muted" data-testid="catalog-count">Найдено: {total}</div>

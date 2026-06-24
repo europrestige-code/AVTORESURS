@@ -130,7 +130,7 @@ class AutoService:
         else:
             query["status"] = {"$ne": AutoVehicleStatus.HIDDEN.value}
 
-        for key in ("country", "source", "make", "model", "listing_type", "condition", "damage_type"):
+        for key in ("country", "source", "make", "model", "listing_type", "condition", "damage_type", "body_type"):
             val = filters.get(key)
             if val:
                 query[key] = val
@@ -209,11 +209,104 @@ class AutoService:
             if updates["current_price_nzd"] < 0:
                 raise HTTPException(400, "Цена не может быть отрицательной.")
             updates["estimated_total_nzd"] = calculate_price_breakdown(updates["current_price_nzd"])["total_nzd"]
+        # Detect transition to "won" to trigger CRM linkage
+        new_status = updates.get("status")
+        transitioning_to_won = False
+        if new_status == AutoVehicleStatus.WON.value or new_status == AutoVehicleStatus.WON:
+            current = await self.db.auto_vehicles.find_one({"id": vehicle_id})
+            if current and current.get("status") != AutoVehicleStatus.WON.value:
+                transitioning_to_won = True
         updates["updated_at"] = datetime.utcnow()
         result = await self.db.auto_vehicles.update_one({"id": vehicle_id}, {"$set": updates})
         if result.matched_count == 0:
             raise HTTPException(404, "Автомобиль не найден.")
+        if transitioning_to_won:
+            try:
+                await self._on_vehicle_won(vehicle_id)
+            except Exception as e:
+                logger.warning(f"CRM linkage failed for vehicle {vehicle_id}: {e}")
         return await self.get_vehicle(vehicle_id)
+
+    async def _on_vehicle_won(self, vehicle_id: str) -> None:
+        """When a vehicle status flips to 'won': identify the winning bid,
+        mark it as 'won' and the rest as 'lost', and create a CRMOrder record
+        linked to the customer so they appear in the existing CRM."""
+        vehicle = await self.db.auto_vehicles.find_one({"id": vehicle_id})
+        if not vehicle:
+            return
+        # Pick the highest bid (active wins; otherwise highest by amount)
+        winning = await self.db.auto_bids.find_one(
+            {"vehicle_id": vehicle_id, "status": AutoBidStatus.ACTIVE.value},
+            sort=[("max_bid_nzd", -1), ("created_at", 1)],
+        )
+        if not winning:
+            winning = await self.db.auto_bids.find_one(
+                {"vehicle_id": vehicle_id},
+                sort=[("max_bid_nzd", -1), ("created_at", 1)],
+            )
+        if not winning:
+            logger.info(f"Vehicle {vehicle_id} won but no bids found; skipping CRM link.")
+            return
+        await self.db.auto_bids.update_one(
+            {"id": winning["id"]}, {"$set": {"status": AutoBidStatus.WON.value}}
+        )
+        await self.db.auto_bids.update_many(
+            {"vehicle_id": vehicle_id, "id": {"$ne": winning["id"]},
+             "status": {"$in": [AutoBidStatus.ACTIVE.value, AutoBidStatus.OUTBID.value]}},
+            {"$set": {"status": AutoBidStatus.LOST.value}},
+        )
+        user = await self.db.users.find_one({"id": winning["user_id"]})
+        if not user:
+            return
+        info = user.get("customer_info") or {}
+        name = (
+            f"{info.get('first_name', '')} {info.get('last_name', '')}".strip()
+            or user.get("email")
+            or "Клиент"
+        )
+        price = float(winning["max_bid_nzd"])
+        bd = calculate_price_breakdown(price)
+        crm_order_doc = {
+            "id": __import__("uuid").uuid4().__str__(),
+            "order_id": f"AUTO-{vehicle_id[:8].upper()}",
+            "customer_id": user["id"],
+            "customer_name": name,
+            "customer_email": user.get("email", ""),
+            "customer_phone": user.get("phone", "") or info.get("phone", ""),
+            "product_name": vehicle.get("title_ru") or "Автомобиль",
+            "product_url": vehicle.get("source_url"),
+            "supplier_store": vehicle.get("source") or "BuyAnywhere Auto",
+            "customer_paid_amount": price,
+            "supplier_cost": price,
+            "commission": bd["commission_nzd"],
+            "profit": None,
+            "status": "paid",
+            "payment_status": "pending",
+            "priority": "high",
+            "created_at": datetime.utcnow(),
+            "internal_notes": [f"Авто-сделка из BuyAnywhere Auto. Vehicle {vehicle_id}."],
+            "customer_notes": None,
+            "assigned_to": None,
+            "source": "buyanywhere_auto",
+            "auto_vehicle_id": vehicle_id,
+            "auto_bid_id": winning["id"],
+        }
+        # idempotency: skip if already linked
+        existing = await self.db.crm_orders.find_one({"auto_vehicle_id": vehicle_id})
+        if existing:
+            logger.info(f"CRM order already exists for vehicle {vehicle_id}")
+            return
+        await self.db.crm_orders.insert_one(crm_order_doc)
+        # Auto-create a 'won' logistics event for the winning user
+        await self.add_logistics_event(
+            vehicle_id,
+            AutoLogisticsEventCreate(
+                user_id=winning["user_id"],
+                status=AutoLogisticsStatus.WON,
+                note_ru=f"Аукцион выигран. Сумма: NZ${price:,.0f}",
+            ),
+        )
+        logger.info(f"Linked vehicle {vehicle_id} to CRM order {crm_order_doc['order_id']}")
 
     async def delete_vehicle(self, vehicle_id: str, hard: bool = False) -> None:
         if hard:

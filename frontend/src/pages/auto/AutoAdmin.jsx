@@ -3,7 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import autoApi from "../../services/autoApi";
 import { fmtPrice } from "../../components/auto/VehicleCard";
 
-const TABS = ["vehicles", "bids", "deposits", "import", "invoices", "logistics", "clients"];
+const TABS = ["vehicles", "bids", "deposits", "import", "invoices", "logistics", "crm", "clients"];
 const TAB_LABEL = {
   vehicles: "Автомобили",
   bids: "Ставки",
@@ -11,6 +11,7 @@ const TAB_LABEL = {
   import: "Импорт",
   invoices: "Счета",
   logistics: "Логистика",
+  crm: "CRM сделки",
   clients: "Клиенты",
 };
 
@@ -49,6 +50,7 @@ export default function AutoAdmin() {
       {tab === "import" && <ImportTab />}
       {tab === "invoices" && <InvoicesTab />}
       {tab === "logistics" && <LogisticsTab />}
+      {tab === "crm" && <CrmTab />}
       {tab === "clients" && <ClientsTab />}
     </div>
   );
@@ -96,6 +98,18 @@ function VehiclesTab() {
     await autoApi.delete(`/admin/vehicles/${id}`);
     await load();
   };
+  const markWon = async (id) => {
+    if (!confirm("Отметить автомобиль как 'Выигран'? Будет создана CRM-сделка.")) return;
+    try {
+      const r = await autoApi.post(`/admin/vehicles/${id}/mark-won`);
+      alert(r.data.crm_order
+        ? `Создана CRM-сделка ${r.data.crm_order.order_id}`
+        : "Статус обновлён. CRM-сделка не создана (нет ставок).");
+      await load();
+    } catch (e) {
+      alert(e.response?.data?.detail || "Ошибка.");
+    }
+  };
 
   return (
     <div>
@@ -129,7 +143,8 @@ function VehiclesTab() {
                   <button className="auto-btn auto-btn-outline" onClick={() => aiTranslate(v.id)} data-testid={`admin-translate-${v.id}`}>Перевод</button>
                   <button className="auto-btn auto-btn-outline" onClick={() => aiSummary(v.id)} data-testid={`admin-summary-${v.id}`}>Резюме</button>
                 </td>
-                <td>
+                <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button className="auto-btn auto-btn-success" onClick={() => markWon(v.id)} data-testid={`admin-mark-won-${v.id}`}>Выигран</button>
                   <button className="auto-btn auto-btn-danger" onClick={() => remove(v.id)} data-testid={`admin-hide-${v.id}`}>Скрыть</button>
                 </td>
               </tr>
@@ -241,7 +256,26 @@ function DepositsTab() {
             <td>NZ${d.amount}</td>
             <td>{d.method}</td>
             <td><span className="auto-badge">{d.status}</span></td>
-            <td className="auto-muted">{d.payment_proof_file || d.payment_proof_note || "—"}</td>
+            <td className="auto-muted">
+              {d.payment_proof_file ? (
+                <a
+                  href={`${process.env.REACT_APP_BACKEND_URL}/api/auto/deposit/${d.id}/proof`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const token = localStorage.getItem("access_token");
+                    fetch(e.currentTarget.href, { headers: { Authorization: `Bearer ${token}` } })
+                      .then((r) => r.blob())
+                      .then((b) => window.open(URL.createObjectURL(b), "_blank"));
+                  }}
+                  style={{ color: "var(--auto-primary)" }}
+                  data-testid={`deposit-proof-link-${d.id}`}
+                >
+                  Открыть файл
+                </a>
+              ) : d.payment_proof_note || "—"}
+            </td>
             <td style={{ display: "flex", gap: 6 }}>
               <button className="auto-btn auto-btn-success" onClick={() => verify(d.id)} data-testid={`admin-verify-${d.id}`}>Одобрить</button>
               <button className="auto-btn auto-btn-danger" onClick={() => reject(d.id)} data-testid={`admin-reject-${d.id}`}>Отклонить</button>
@@ -395,6 +429,33 @@ function LogisticsTab() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function CrmTab() {
+  const [items, setItems] = useState([]);
+  useEffect(() => { autoApi.get("/admin/crm-orders").then((r) => setItems(r.data)); }, []);
+  return (
+    <table className="auto-table" data-testid="admin-crm-table">
+      <thead>
+        <tr><th>Order ID</th><th>Клиент</th><th>Авто</th><th>Сумма</th><th>Статус</th><th>Дата</th></tr>
+      </thead>
+      <tbody>
+        {items.length === 0 && (
+          <tr><td colSpan={6} className="auto-muted">CRM-сделок пока нет. Они создаются автоматически при отметке авто как «Выигран».</td></tr>
+        )}
+        {items.map((o) => (
+          <tr key={o.id} data-testid={`admin-crm-row-${o.id}`}>
+            <td style={{ fontWeight: 600 }}>{o.order_id}</td>
+            <td>{o.customer_name}<div className="auto-muted" style={{ fontSize: 12 }}>{o.customer_email}</div></td>
+            <td>{o.product_name}</td>
+            <td>{fmtPrice(o.customer_paid_amount)}</td>
+            <td><span className="auto-badge">{o.status}</span></td>
+            <td>{o.created_at ? new Date(o.created_at).toLocaleString("ru-RU") : "—"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

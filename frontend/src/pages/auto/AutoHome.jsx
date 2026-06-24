@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import autoApi from "../../services/autoApi";
 import VehicleCard from "../../components/auto/VehicleCard";
+import SearchHero from "../../components/auto/SearchHero";
 
 const HOW = [
   ["Выбираете автомобиль", "Каталог содержит аукционные и розничные авто из Новой Зеландии. Австралия — по запросу."],
@@ -24,20 +25,27 @@ export default function AutoHome() {
   return (
     <>
       <section className="auto-hero auto-section" style={{ borderRadius: 20 }}>
-        <div style={{ maxWidth: 720 }}>
-          <div className="auto-badge auto-badge-primary" style={{ marginBottom: 16 }}>BuyAnywhere · Auto</div>
-          <h1 style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.05, margin: 0, letterSpacing: "-0.02em" }}>
-            Автомобили из Новой Зеландии под заказ
+        <div style={{ maxWidth: 760 }}>
+          <div className="auto-badge auto-badge-primary" style={{ marginBottom: 16 }}>АвтоРесурс · автомобили со всего мира</div>
+          <h1 style={{ fontSize: 48, fontWeight: 800, lineHeight: 1.05, margin: 0, letterSpacing: "-0.02em" }}>
+            Автомобили из Новой Зеландии, Австралии и Японии — под заказ
           </h1>
-          <p className="auto-muted" style={{ fontSize: 18, marginTop: 14, maxWidth: 620 }}>
-            Аукционные авто, повреждённые автомобили, доноры, коммерческий транспорт и запчасти
-            с расчётом доставки, комиссии и логистики.
+          <p className="auto-muted" style={{ fontSize: 18, marginTop: 14, maxWidth: 660 }}>
+            Аукционные авто, повреждённые автомобили, доноры, коммерческий транспорт и запчасти —
+            из Turners, Manheim и Pickles. Прозрачный расчёт доставки, комиссии и логистики.
           </p>
           <div style={{ display: "flex", gap: 12, marginTop: 22, flexWrap: "wrap" }}>
             <Link to="/auto/catalog" className="auto-btn" data-testid="home-cta-catalog">Смотреть автомобили</Link>
             <Link to="/auto/how-it-works" className="auto-btn auto-btn-outline" data-testid="home-cta-how">Как это работает</Link>
           </div>
+          <div className="auto-muted" style={{ fontSize: 12, marginTop: 18, display: "flex", gap: 18, flexWrap: "wrap" }}>
+            <span>● Turners NZ</span><span>● Manheim NZ</span><span>● Pickles AU</span><span>● Дилерские стоки</span>
+          </div>
         </div>
+      </section>
+
+      <section className="auto-section" style={{ paddingTop: 0 }}>
+        <SearchHero variant="home" />
       </section>
 
       <section className="auto-section">

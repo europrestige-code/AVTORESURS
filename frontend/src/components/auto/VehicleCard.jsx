@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import CountdownTimer from "./CountdownTimer";
 
 const STATUS_BADGE = {
   available: { cls: "auto-badge-success", text: "Доступен" },
@@ -65,8 +66,12 @@ export default function VehicleCard({ vehicle }) {
           </div>
           {vehicle.auction_end_time && (
             <div style={{ textAlign: "right" }}>
-              <div className="auto-muted" style={{ fontSize: 12 }}>Окончание</div>
-              <div style={{ fontSize: 13 }}>{fmtDate(vehicle.auction_end_time)}</div>
+              <div className="auto-muted" style={{ fontSize: 12 }}>До окончания</div>
+              <CountdownTimer
+                target={vehicle.auction_end_time}
+                compact
+                testid={`vehicle-countdown-${vehicle.id}`}
+              />
             </div>
           )}
         </div>
