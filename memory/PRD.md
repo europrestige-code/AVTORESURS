@@ -42,7 +42,12 @@ framework.
   **Non-runner = ×2 transport** (towing surcharge).
 
 ## What's been implemented (2026-01)
-- ✅ Backend models, services, routes per spec
+
+### 2026-02 — AutoHome redesign + chat FAB fix
+- ✅ Rebuilt `AutoHome.jsx` to match user-provided Tailwind reference: full-bleed hero with car/right-side imagery + radial blue glow, search panel with 3 tabs (Все автомобили / Повреждённые / Купить сейчас), Ближайшие аукционы grid (live data from `/api/auto/auctions/calendar`), Почему выбирают нас stats (10+/50 000+/30+/100%), Популярные категории grid, CTA panel, footer features row.
+- ✅ Chat FAB moved to `bottom: 90px; z-index: 9999` so it clears the Emergent preview badge. Verified end-to-end: Тина greets in Russian, responds with NZ$1,000 deposit info.
+- ✅ QuickCategoryStrip "End of Life" tile renamed to "Списанные авто" (i18n consistency).
+- ✅ ContactsBar at top (WhatsApp / NZ / RUS phones) preserved per user request.
 - ✅ Internal proxy bidding with deposit gate and outbid handling
 - ✅ Manual + Stripe deposit verify workflow with real file storage on disk
 - ✅ Watchlist / inquiries / invoices / logistics events

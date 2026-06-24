@@ -23,7 +23,7 @@ const ITEMS = [
   { key: "auctions",  label: "Аукционы",       to: "/auto/auctions-list",  Icon: Car,         countKey: "auctions" },
   { key: "buynow",    label: "Купить сейчас",  to: "/auto/buynow",         Icon: CreditCard,  countKey: "buynow" },
   { key: "damaged",   label: "Повреждённые",   to: "/auto/damaged",        Icon: Wrench,      countKey: "damaged" },
-  { key: "eol",       label: "End of Life",    to: "/auto/end-of-life",    Icon: Recycle,     countKey: "eol" },
+  { key: "eol",       label: "Списанные авто",    to: "/auto/end-of-life",    Icon: Recycle,     countKey: "eol" },
   { key: "calendar",  label: "Календарь",      to: "/auto/auctions",       Icon: CalendarDays },
   { key: "moto",      label: "Мотоциклы",      Icon: Bike,                 soon: true },
   { key: "boats",     label: "Лодки и катера", Icon: Anchor,               soon: true },
