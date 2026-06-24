@@ -578,9 +578,9 @@
 /* --- Chat widget --- */
 .auto-root .chat-fab {
   position: fixed;
-  bottom: 22px;
+  bottom: 90px;
   right: 22px;
-  z-index: 60;
+  z-index: 9999;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -598,9 +598,9 @@
 .auto-root .chat-fab__label { font-size: 14px; }
 .auto-root .chat-panel {
   position: fixed;
-  bottom: 22px;
+  bottom: 90px;
   right: 22px;
-  z-index: 60;
+  z-index: 9999;
   width: min(380px, calc(100vw - 32px));
   height: 540px;
   background: #0d0d0d;
@@ -665,6 +665,6 @@
 
 @media (max-width: 540px) {
   .auto-root .chat-fab__label { display: none; }
-  .auto-root .chat-fab { padding: 14px; }
-  .auto-root .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 12px; height: 70vh; }
+  .auto-root .chat-fab { padding: 14px; bottom: 80px; }
+  .auto-root .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 80px; height: 70vh; }
 }
