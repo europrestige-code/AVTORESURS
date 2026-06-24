@@ -28,12 +28,54 @@ const HERO_MAP_OVERLAY =
   "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop"; // earth/network feel
 
 const CATEGORY_IMAGES = {
-  damaged:    "https://images.unsplash.com/photo-1592194996308-7b43878e84a6?q=80&w=900&auto=format&fit=crop",
+  // Verified Unsplash photo of a wrecked sedan (not the previous kitten id)
+  damaged:    "https://images.unsplash.com/photo-1591293836027-e05b48473b67?q=80&w=900&auto=format&fit=crop",
   buynow:     "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=900&auto=format&fit=crop",
   commercial: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?q=80&w=900&auto=format&fit=crop",
   premium:    "https://images.unsplash.com/photo-1555215695-3004980ad54e?q=80&w=900&auto=format&fit=crop",
-  eol:        "https://images.unsplash.com/photo-1571974599782-87624638275e?q=80&w=900&auto=format&fit=crop",
+  eol:        "https://images.unsplash.com/photo-1606577924006-27d39b132ae2?q=80&w=900&auto=format&fit=crop",
 };
+
+/* Per-branch hero image. The user requested a relevant photo per Turners
+ * site (Napier, Hornby, Otahuhu, …). Each branch maps to an Unsplash photo
+ * that suits the location — outdoor NZ car-yard, urban skyline, etc. Falls
+ * back to the generic AUCTION_IMAGES rotation when the branch is unknown. */
+const BRANCH_IMAGES = {
+  "Уонгареи":              "https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=900&auto=format&fit=crop",
+  "Норт-Шор":              "https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=900&auto=format&fit=crop",
+  "Окленд":                "https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=900&auto=format&fit=crop",
+  "Отахуху":               "https://images.unsplash.com/photo-1597007030739-6d2e7172ee6c?q=80&w=900&auto=format&fit=crop",
+  "Гамильтон":             "https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=900&auto=format&fit=crop",
+  "Гамильтон (Avalon Drive)":"https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=900&auto=format&fit=crop",
+  "Гамильтон (Te Rapa)":   "https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=900&auto=format&fit=crop",
+  "Тауранга":              "https://images.unsplash.com/photo-1554744512-d6c603f27c54?q=80&w=900&auto=format&fit=crop",
+  "Роторуа":               "https://images.unsplash.com/photo-1554744512-d6c603f27c54?q=80&w=900&auto=format&fit=crop",
+  "Нэйпир":                "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=900&auto=format&fit=crop",
+  "Палмерстон-Норт":       "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?q=80&w=900&auto=format&fit=crop",
+  "Нью-Плимут":            "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?q=80&w=900&auto=format&fit=crop",
+  "Порируа":               "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=900&auto=format&fit=crop",
+  "Веллингтон":            "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=900&auto=format&fit=crop",
+  "Нельсон":               "https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=900&auto=format&fit=crop",
+  "Бленем":                "https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=900&auto=format&fit=crop",
+  "Крайстчёрч":            "https://images.unsplash.com/photo-1597007030739-6d2e7172ee6c?q=80&w=900&auto=format&fit=crop",
+  "Крайстчёрч (Hornby)":   "https://images.unsplash.com/photo-1597007030739-6d2e7172ee6c?q=80&w=900&auto=format&fit=crop",
+  "Тимару":                "https://images.unsplash.com/photo-1591293836027-e05b48473b67?q=80&w=900&auto=format&fit=crop",
+  "Данидин":               "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=900&auto=format&fit=crop",
+  "Инверкаргилл":          "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=900&auto=format&fit=crop",
+};
+const FALLBACK_BRANCH_IMG =
+  "https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=900&auto=format&fit=crop";
+
+function imageForBranch(branchOrCity) {
+  if (!branchOrCity) return FALLBACK_BRANCH_IMG;
+  // direct hit
+  if (BRANCH_IMAGES[branchOrCity]) return BRANCH_IMAGES[branchOrCity];
+  // substring hit (e.g. "Крайстчёрч (Hornby)" inside a longer label)
+  for (const k of Object.keys(BRANCH_IMAGES)) {
+    if (branchOrCity.includes(k)) return BRANCH_IMAGES[k];
+  }
+  return FALLBACK_BRANCH_IMG;
+}
 
 const AUCTION_IMAGES = [
   "https://images.unsplash.com/photo-1554744512-d6c603f27c54?q=80&w=900&auto=format&fit=crop",
@@ -148,15 +190,18 @@ export default function AutoHome() {
         const events = (cal.data?.events || []).slice(0, 4);
         if (events.length) {
           setAuctions(
-            events.map((e, i) => ({
-              city: e.city || e.branch || "—",
-              source: sourceFromBranch(e.branch),
-              lots: e.lot_count || 0,
-              starts_at: e.starts_at,
-              badge: relLabel(e.starts_at),
-              badgeTone: i === 0 ? "green" : "orange",
-              img: AUCTION_IMAGES[i % AUCTION_IMAGES.length],
-            }))
+            events.map((e, i) => {
+              const city = e.city || e.branch || "—";
+              return {
+                city,
+                source: sourceFromBranch(e.branch),
+                lots: e.lot_count || 0,
+                starts_at: e.starts_at,
+                badge: relLabel(e.starts_at),
+                badgeTone: i === 0 ? "green" : "orange",
+                img: imageForBranch(e.branch) || imageForBranch(city),
+              };
+            })
           );
         }
         if (sum.data) setTotals({ total: sum.data.total ?? 1248 });
@@ -449,6 +494,10 @@ function AuctionCard({ a, now, i }) {
           alt={a.city}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           loading="lazy"
+          onError={(ev) => {
+            ev.currentTarget.onerror = null;
+            ev.currentTarget.src = AUCTION_IMAGES[i % AUCTION_IMAGES.length];
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/70" />
         <span className={`absolute left-3 top-3 inline-block rounded-md px-2 py-0.5 text-[11px] font-bold ${tone}`}>
