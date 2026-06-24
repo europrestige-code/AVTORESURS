@@ -241,6 +241,222 @@ async def admin_refresh_auctions(
     return await svc.refresh(categories=cats)
 
 
+# ----- Source importers (Turners / Manheim / Pickles) -----
+
+@router.get("/admin/sources")
+async def admin_list_sources(_: Dict[str, Any] = Depends(require_admin)):
+    from services.auto_source_importers import IMPORTERS
+    return {"sources": list(IMPORTERS.keys())}
+
+
+@router.post("/admin/sources/scan")
+async def admin_sources_scan(
+    payload: Dict[str, Any] = Body(...),
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+    ai: AutoAIService = Depends(get_ai_service),
+):
+    """Run a single source importer in preview mode (no DB writes).
+    Body: {source: 'turners'|'manheim'|'pickles', limit: int=20}"""
+    from services.auto_source_importers import IMPORTERS, find_duplicate
+    src = (payload.get("source") or "").lower()
+    if src not in IMPORTERS:
+        raise HTTPException(400, f"Неизвестный источник: {src}")
+    limit = int(payload.get("limit", 20))
+    cls = IMPORTERS[src]
+    try:
+        importer = cls(ai=ai, db=db)
+    except TypeError:
+        importer = cls(ai=ai)
+    try:
+        raw_items = await importer.fetch_vehicles(limit=limit)
+    except Exception as e:
+        return {"ok": False, "error": str(e), "items": []}
+    items = []
+    for raw in raw_items:
+        try:
+            vehicle = importer.normalise(raw)
+            existing = await find_duplicate(db, vehicle)
+            items.append({
+                "vehicle": vehicle.model_dump(mode="json"),
+                "duplicate_of": existing.get("id") if existing else None,
+                "is_new": existing is None,
+            })
+        except Exception as e:
+            items.append({"error": str(e), "raw": raw})
+    return {
+        "ok": True,
+        "source": src,
+        "fetched": len(raw_items),
+        "new": sum(1 for i in items if i.get("is_new")),
+        "duplicates": sum(1 for i in items if i.get("duplicate_of")),
+        "items": items,
+    }
+
+
+@router.post("/admin/sources/import")
+async def admin_sources_import(
+    payload: Dict[str, Any] = Body(...),
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+    ai: AutoAIService = Depends(get_ai_service),
+):
+    """Import vehicles from one source.
+    Body: {source, limit, skip_duplicates: bool=true, ids?: [source_reference,...]}.
+    If `ids` is provided, only items whose source_reference is in that list are saved."""
+    from services.auto_source_importers import IMPORTERS, ImportOrchestrator
+    src = (payload.get("source") or "").lower()
+    if src not in IMPORTERS:
+        raise HTTPException(400, f"Неизвестный источник: {src}")
+    limit = int(payload.get("limit", 20))
+    ids_filter = set(payload.get("ids") or [])
+    orchestrator = ImportOrchestrator(db, ai=ai)
+    # Patch the orchestrator's run_one to respect the optional ids filter
+    cls = IMPORTERS[src]
+    try:
+        importer = cls(ai=ai, db=db)
+    except TypeError:
+        importer = cls(ai=ai)
+    try:
+        raw_items = await importer.fetch_vehicles(limit=limit)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    from services.auto_source_importers import find_duplicate, ImportResult
+    from models.auto import AutoSyncStatus
+    res = ImportResult(importer=src)
+    res.fetched = len(raw_items)
+    skip_dups = payload.get("skip_duplicates", True)
+    from datetime import datetime as _dt
+    for raw in raw_items:
+        try:
+            vehicle = importer.normalise(raw)
+            if ids_filter and (vehicle.source_reference or "") not in ids_filter:
+                res.skipped += 1
+                continue
+            existing = await find_duplicate(db, vehicle)
+            payload_doc = vehicle.model_dump()
+            if existing:
+                if skip_dups:
+                    res.skipped += 1
+                    continue
+                payload_doc.pop("id", None)
+                payload_doc.pop("created_at", None)
+                payload_doc["updated_at"] = _dt.utcnow()
+                payload_doc["last_sync_time"] = _dt.utcnow()
+                await db.auto_vehicles.update_one(
+                    {"id": existing["id"]}, {"$set": payload_doc}
+                )
+                res.updated += 1
+            else:
+                await db.auto_vehicles.insert_one(payload_doc)
+                res.created += 1
+        except Exception as e:
+            res.failed += 1
+            res.errors.append(str(e))
+    from datetime import datetime as _dt2
+    res.finished_at = _dt2.utcnow()
+    if res.failed and res.created + res.updated == 0:
+        res.sync_status = AutoSyncStatus.FAILED
+    elif res.failed:
+        res.sync_status = AutoSyncStatus.PARTIAL
+    await db.auto_import_runs.insert_one(res.to_dict())
+    return res.to_dict()
+
+
+@router.get("/admin/sources/runs")
+async def admin_sources_runs(
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+    limit: int = 25,
+):
+    items = []
+    async for r in db.auto_import_runs.find().sort("started_at", -1).limit(limit):
+        r.pop("_id", None)
+        items.append(r)
+    return items
+
+
+@router.get("/admin/scheduler/status")
+async def admin_scheduler_status(_: Dict[str, Any] = Depends(require_admin)):
+    from services import auto_scheduler
+    return auto_scheduler.status()
+
+
+# ----- Image branding backfill -----
+
+@router.post("/admin/images/backfill-branding")
+async def admin_backfill_branding(
+    payload: Optional[Dict[str, Any]] = Body(None),
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Run the АвтоРесурс branded-frame overlay on existing vehicles.
+
+    Body: {limit?: int=20, force?: bool=false, vehicle_ids?: [id,...]}.
+    By default only processes vehicles that have source_images but no
+    local_images (idempotent). Pass force=true to re-brand.
+    """
+    from services.auto_image_service import brand_vehicle_images
+    payload = payload or {}
+    limit = int(payload.get("limit", 20))
+    force = bool(payload.get("force", False))
+    vehicle_ids = payload.get("vehicle_ids") or []
+    query: Dict[str, Any] = {}
+    if vehicle_ids:
+        query["id"] = {"$in": vehicle_ids}
+    else:
+        # Either explicit source_images list, OR `images` list, but no local_images yet
+        query["$and"] = [
+            {"$or": [
+                {"source_images": {"$exists": True, "$ne": []}},
+                {"images": {"$exists": True, "$ne": []}},
+            ]},
+        ]
+        if not force:
+            query["$and"].append(
+                {"$or": [
+                    {"local_images": {"$exists": False}},
+                    {"local_images": {"$eq": []}},
+                ]}
+            )
+    cursor = db.auto_vehicles.find(query).limit(limit)
+    processed = 0
+    branded_total = 0
+    errors: List[Dict[str, Any]] = []
+    async for v in cursor:
+        v_id = v.get("id")
+        source_imgs = v.get("source_images") or v.get("images") or []
+        if not source_imgs:
+            continue
+        try:
+            local_paths = await brand_vehicle_images(
+                source_imgs[:6],
+                vehicle_id=v_id,
+                source_label=v.get("source") or "",
+                vehicle_title=v.get("title_ru"),
+            )
+        except Exception as e:
+            errors.append({"vehicle_id": v_id, "error": str(e)})
+            continue
+        if local_paths:
+            await db.auto_vehicles.update_one(
+                {"id": v_id},
+                {"$set": {
+                    "local_images": local_paths,
+                    "image_rights_status": "admin_uploaded",
+                    "updated_at": datetime.utcnow(),
+                }},
+            )
+            branded_total += len(local_paths)
+        processed += 1
+    return {
+        "processed": processed,
+        "branded_images": branded_total,
+        "errors": errors,
+        "at": datetime.utcnow().isoformat(),
+    }
+
+
 @router.get("/catalog-summary")
 async def catalog_summary(svc: AutoService = Depends(get_auto_service)):
     """Counts for the catalog hero (Turners-style): total + by body_type + by listing_type + makes."""
@@ -264,6 +480,21 @@ async def catalog_summary(svc: AutoService = Depends(get_auto_service)):
     listing_types = await _bucket("listing_type")
     makes = await _bucket("make", limit=200)
     countries = await _bucket("country")
+    # Category-style counters
+    damaged_count = await svc.db.auto_vehicles.count_documents({
+        **base,
+        "$or": [
+            {"condition": "Повреждённое"},
+            {"damage_type": {"$nin": [None, "", "Без повреждений"]}},
+        ],
+    })
+    eol_count = await svc.db.auto_vehicles.count_documents({
+        **base,
+        "$or": [
+            {"condition": "На запчасти"},
+            {"damage_type": {"$in": ["Двигатель", "Передний удар", "Тотал"]}},
+        ],
+    })
     # distinct models grouped by make for the cascading dropdown
     pipeline = [
         {"$match": {"$and": [base, {"make": {"$ne": None}}, {"model": {"$ne": None}}]}},
@@ -281,6 +512,8 @@ async def catalog_summary(svc: AutoService = Depends(get_auto_service)):
         "makes": makes,
         "countries": countries,
         "models_by_make": models_by_make,
+        "damaged_count": damaged_count,
+        "eol_count": eol_count,
     }
 
 

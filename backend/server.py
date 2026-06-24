@@ -527,6 +527,8 @@ async def startup_services():
             await auto_svc.ensure_indexes()
             from services.auto_auctions_service import AuctionCalendarService
             await AuctionCalendarService(db).ensure_indexes()
+            from services import auto_scheduler
+            auto_scheduler.start(db)
         except Exception as ie:
             logger.warning(f"Auto module index init failed: {ie}")
         

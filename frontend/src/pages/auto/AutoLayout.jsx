@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import QuickCategoryStrip from "../../components/auto/QuickCategoryStrip";
 import "./auto.css";
 
 const NAV = [
@@ -79,6 +80,7 @@ export default function AutoLayout() {
             )}
           </div>
         </div>
+        <QuickCategoryStrip />
         <Outlet />
       </div>
       <div className="auto-container" style={{ marginTop: 60, paddingBottom: 32, color: "var(--auto-muted)", fontSize: 13 }}>

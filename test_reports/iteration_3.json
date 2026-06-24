@@ -1,0 +1,87 @@
+{
+  "summary": "Iteration 3 — scheduler / source importers (scan + import + duplicate) / branding backfill / QCS / admin tabs. 15/17 backend tests PASS; all frontend flows PASS. Two real backend bugs found: (1) /uploads/branded/* not reachable via REACT_APP_BACKEND_URL (ingress only forwards /api/*); (2) branding backfill is NOT idempotent when brand_vehicle_images returns 0 paths — vehicles keep being re-processed on every call.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /uploads/branded/<file>.jpg via REACT_APP_BACKEND_URL",
+        "issue": "Public URL routes /uploads/* to the frontend container (port 3000) and returns text/html (frontend SPA shell), not the image file. Only /api/* is forwarded to backend by the Kubernetes ingress. Branded vehicle photos referenced from vehicle.local_images=['/uploads/branded/<x>.jpg'] will 404/HTML in production. Internal http://localhost:8001/uploads/branded/<x>.jpg DOES return image/jpeg correctly. Fix: mount StaticFiles under /api/uploads (i.e. app.mount('/api/uploads', StaticFiles(...))) and emit local_images as '/api/uploads/branded/<x>.jpg', or use the existing FileResponse pattern (/api/auto/uploads/<...>) inside the auto router.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "POST /api/auto/admin/images/backfill-branding",
+        "issue": "Idempotency broken. Spec says 'a second call must return processed:0 (no force flag)'. Observed: first call → processed=2/branded_images=1; immediate second call → processed=2/branded_images=1 (same vehicles re-processed). Root cause: in auto_routes.admin_backfill_branding the local_images field is only updated when brand_vehicle_images() returns a non-empty list (`if local_paths:`). If brand_vehicle_images returns [] (e.g. all source images fail to download), the vehicle keeps source_images set + local_images empty -> matches the same query again on next run. Fix: always set a 'branded_attempted_at' marker (or write local_images=[] when run failed), so the idempotent guard excludes vehicles already attempted.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/auto/admin/sources/scan",
+        "issue": "Returns 200 OK with `ok:false, error:'...', items:[]` for known sources when the source raises (e.g. Manheim/Pickles network error). That matches the agent-to-agent note (acceptable), but it's worth surfacing the source name & a 5xx-style error code instead of a 200 to make UI error reporting cleaner."
+      },
+      {
+        "endpoint": "POST /api/auto/admin/images/backfill-branding",
+        "issue": "When brand_vehicle_images partially succeeds (some images return [] paths), branded_images undercounts and processed doesn't reflect real vehicles updated. Consider returning {processed, updated, failed} separately for clarity."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Vehicle gallery / catalog when local_images uses /uploads/branded/...",
+        "issue": "Linked to the /uploads ingress bug above — branded photo URLs will render as broken images in production.",
+        "affected_selectors": ["VehicleCard img", "AutoVehicleDetail gallery"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auto_iteration3.py",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [
+    "Fix /uploads static mount routing: either mount under /api/uploads, or expose a /api/auto/uploads/{path:path} FileResponse endpoint. Then update brand_vehicle_images / admin_backfill_branding to write that prefixed path into vehicle.local_images.",
+    "Fix branding idempotency: when admin_backfill_branding processes a vehicle, ALWAYS persist a marker (e.g. branded_attempted_at=utcnow() and/or local_images=[] on failure) so the same vehicle isn't picked up again without force=true.",
+    "Backfill existing vehicle rows whose local_images already use '/uploads/branded/...' so they point at the new public prefix once routing is fixed."
+  ],
+  "critical_code_review_comments": [
+    "auto_routes.py is now ~1090 lines — over the 700-line guideline. Split into auto_public_routes.py / auto_admin_routes.py / auto_admin_sources_routes.py / auto_admin_images_routes.py / auto_stripe_routes.py.",
+    "admin_sources_import duplicates a lot of orchestrator logic (re-instantiating the importer, calling find_duplicate) instead of using ImportOrchestrator.run_one; if scan and import diverge on normalisation rules, duplicate detection will silently break. Prefer extending ImportOrchestrator with an ids_filter.",
+    "auto_scheduler.start() uses asyncio.get_event_loop() which is deprecated in Python 3.12+. Use asyncio.create_task() inside an async startup hook or asyncio.get_running_loop().",
+    "scheduler exposes last_run_at/last_result but no last_error — when a refresh fails it's only logged. Consider persisting last_error so the admin tab can show it.",
+    "admin_backfill_branding builds an open-ended query that selects ALL vehicles with images and no local_images. For larger DBs add a hard cap and skip vehicles whose source URLs already point at our own /uploads/ host."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auto_iteration3.py (created)"
+  ],
+  "success_rate": {"backend": "88% (15/17)", "frontend": "100% (all targeted flows)"},
+  "test_credentials": "admin@buyanywhere.com / admin12345 ; client@buyanywhere.com / client12345",
+  "seed_data_creation": "Tests inserted ~15 new turners-sourced vehicles via /admin/sources/import (preview→import flow); re-run shows skipped>=1, created=0 (duplicate detection PASS). Branding backfill created ~12 jpgs under /app/backend/uploads/branded/.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest at /app/backend/tests/test_auto_iteration3.py. KEY GOTCHAS: (1) Tests must NOT be run with pytest-xdist parallel — backfill+scan tests step on each other; use `pytest -o 'addopts=' backend/tests/test_auto_iteration3.py`. (2) Two remaining failures (backfill idempotency, /uploads ingress) are real bugs not test issues. Frontend: all admin tabs (sources/branding/auctions) + QCS + navigation verified PASS via localStorage token injection (page.evaluate fetch '/api/auth/login'). admin-tab-sources scan returns 20 rows; import alert: 'Создано: 15 · Обновлено: 0 · Пропущено: 85 · Ошибок: 0'. branding-result text: 'Обработано автомобилей: 1 · создано фото: 0' (note: 0 photos created on re-run is the bug). Scheduler text in admin auctions tab: '✓ включено · последний запуск 24.06.2026, 06:07:04 · сейчас в базе: 47 событий'.",
+  "verified_features": [
+    "GET /api/auto/admin/scheduler/status without auth => 401",
+    "GET /api/auto/admin/scheduler/status with admin => {running:true, interval_seconds:86400, last_run_at:iso|null, last_result:object|null}",
+    "GET /api/auto/admin/sources => {sources:['turners','manheim','pickles']}",
+    "POST /api/auto/admin/sources/scan {source:'turners',limit:5} => 200 ok=true, fetched>=1, items[], new/duplicates counted, NO new auto_vehicles rows (count stable)",
+    "POST /api/auto/admin/sources/scan {source:'unknown'} => 400",
+    "POST /api/auto/admin/sources/import {source:'turners',ids:[refs],skip_duplicates:true} => 200 with importer/fetched/created/updated/skipped/failed/sync_status/errors. Run appears in /admin/sources/runs.",
+    "POST same /import twice => 2nd call created=0, skipped>=1 (duplicate detection via source+source_reference PASS).",
+    "POST /api/auto/admin/images/backfill-branding without admin => 401",
+    "POST /api/auto/admin/images/backfill-branding {limit:3} => writes JPGs to /app/backend/uploads/branded/ (verified: 12 files present)",
+    "POST /api/auto/admin/images/backfill-branding {limit:1, force:true} => 200",
+    "Existing regression: admin+client login, /vehicles, /auctions/calendar, /transport/cost?branch=Wellington&non_runner=true all PASS",
+    "Frontend /auto: data-testid quick-category-strip + all 10 qcs-<key> (auctions/buynow/damaged/eol/calendar/moto/boats/trucks/buses/parts). qcs-count-auctions=11, qcs-count-buynow=2, qcs-count-damaged=3, qcs-count-eol=2. Soon items have class qcs__item--soon, disabled='', clicks do nothing.",
+    "QCS navigation: qcs-auctions→/auto/auctions-list, qcs-buynow→/auto/buynow, qcs-damaged→/auto/damaged, qcs-eol→/auto/end-of-life, qcs-calendar→/auto/auctions",
+    "Frontend /auto/admin admin tabs: admin-tab-sources, admin-tab-branding, admin-tab-auctions all present",
+    "Sources tab: sources-scan-btn populates sources-result with 20 sources-row-{ref}; checkbox toggle works; sources-import-btn triggers alert with import summary",
+    "Branding tab: branding-limit + branding-force + branding-run-btn; result text appears in branding-result",
+    "Auctions admin tab: scheduler status '✓ включено · последний запуск 24.06.2026, 06:07:04 · сейчас в базе: 47 событий' + auctions-refresh-admin-btn FOUND"
+  ],
+  "failing_tests": [
+    "test_backfill_processes_and_idempotent — idempotency broken (see action items)",
+    "test_local_images_served — /uploads/* not reachable via public URL (see action items)"
+  ],
+  "rca of the issue": "Bug 1 (ingress): The Kubernetes ingress only routes /api/* to backend:8001; /uploads/* is currently served by the React dev server (port 3000) which returns the SPA index.html. The StaticFiles mount at app.mount('/uploads', ...) IS correctly serving files at localhost:8001/uploads/branded/<x>.jpg with content-type image/jpeg, confirming the backend is fine and the issue is purely ingress + URL prefixing. Bug 2 (idempotency): admin_backfill_branding only persists vehicle changes when brand_vehicle_images returns non-empty local_paths; vehicles whose remote images all fail (e.g. transient network errors, Unsplash 429, AI overlay error) never get a 'completed' marker, so the same query keeps matching them on every subsequent call. The fix is to ALWAYS mark vehicles as processed (e.g. set local_images=[] or branded_attempted_at=utcnow()) and exclude already-attempted ones from the default query unless force=true."
+}

@@ -3,12 +3,15 @@ import { useAuth } from "../../contexts/AuthContext";
 import autoApi from "../../services/autoApi";
 import { fmtPrice } from "../../components/auto/VehicleCard";
 
-const TABS = ["vehicles", "bids", "deposits", "import", "invoices", "logistics", "crm", "clients"];
+const TABS = ["vehicles", "bids", "deposits", "sources", "import", "branding", "auctions", "invoices", "logistics", "crm", "clients"];
 const TAB_LABEL = {
   vehicles: "Автомобили",
   bids: "Ставки",
   deposits: "Депозиты",
+  sources: "Источники",
   import: "Импорт",
+  branding: "Брендирование",
+  auctions: "Календарь",
   invoices: "Счета",
   logistics: "Логистика",
   crm: "CRM сделки",
@@ -47,7 +50,10 @@ export default function AutoAdmin() {
       {tab === "vehicles" && <VehiclesTab />}
       {tab === "bids" && <BidsTab />}
       {tab === "deposits" && <DepositsTab />}
+      {tab === "sources" && <SourcesTab />}
       {tab === "import" && <ImportTab />}
+      {tab === "branding" && <BrandingTab />}
+      {tab === "auctions" && <AuctionsTab />}
       {tab === "invoices" && <InvoicesTab />}
       {tab === "logistics" && <LogisticsTab />}
       {tab === "crm" && <CrmTab />}
@@ -476,5 +482,284 @@ function ClientsTab() {
         ))}
       </tbody>
     </table>
+  );
+}
+
+function SourcesTab() {
+  const [source, setSource] = useState("turners");
+  const [limit, setLimit] = useState(20);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [selected, setSelected] = useState({});
+  const [runs, setRuns] = useState([]);
+
+  const loadRuns = useCallback(async () => {
+    try {
+      const r = await autoApi.get("/admin/sources/runs", { params: { limit: 10 } });
+      setRuns(r.data);
+    } catch {}
+  }, []);
+  useEffect(() => { loadRuns(); }, [loadRuns]);
+
+  const scan = async () => {
+    setBusy(true); setResult(null); setSelected({});
+    try {
+      const r = await autoApi.post("/admin/sources/scan", { source, limit: Number(limit || 20) });
+      setResult(r.data);
+      // pre-select only new (non-duplicate) items
+      const next = {};
+      (r.data.items || []).forEach((it) => {
+        const ref = it?.vehicle?.source_reference;
+        if (ref && it.is_new) next[ref] = true;
+      });
+      setSelected(next);
+    } catch (e) {
+      setResult({ ok: false, error: e.response?.data?.detail || String(e) });
+    } finally { setBusy(false); }
+  };
+
+  const importSelected = async () => {
+    if (!result) return;
+    const ids = Object.keys(selected).filter((k) => selected[k]);
+    if (!ids.length) { alert("Не выбрано ни одной строки."); return; }
+    setBusy(true);
+    try {
+      const r = await autoApi.post("/admin/sources/import", {
+        source, limit: 100, ids, skip_duplicates: true,
+      });
+      alert(`Создано: ${r.data.created} · Обновлено: ${r.data.updated} · Пропущено: ${r.data.skipped} · Ошибок: ${r.data.failed}`);
+      await loadRuns();
+    } catch (e) {
+      alert(e.response?.data?.detail || "Ошибка импорта.");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 14 }} data-testid="admin-sources">
+      <div className="auto-card" style={{ display: "grid", gap: 10 }}>
+        <div style={{ fontWeight: 600 }}>Поиск автомобилей от источников</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 120px auto", gap: 8 }}>
+          <select className="auto-select" value={source} onChange={(e) => setSource(e.target.value)} data-testid="sources-source">
+            <option value="turners">Turners NZ</option>
+            <option value="manheim">Manheim NZ</option>
+            <option value="pickles">Pickles AU</option>
+          </select>
+          <input type="number" className="auto-input" value={limit} onChange={(e) => setLimit(e.target.value)} data-testid="sources-limit" />
+          <button type="button" className="auto-btn" onClick={scan} disabled={busy} data-testid="sources-scan-btn">
+            {busy ? "Сканируем…" : "Сканировать"}
+          </button>
+        </div>
+        <div className="auto-muted" style={{ fontSize: 13 }}>
+          Сканирование не сохраняет автомобили. Выберите интересующие и нажмите «Импортировать выбранные».
+        </div>
+      </div>
+
+      {result?.ok === false && (
+        <div className="auto-card auto-muted" data-testid="sources-error">
+          Ошибка: {result.error}
+        </div>
+      )}
+
+      {result?.ok && (
+        <div className="auto-card" data-testid="sources-result">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <div>
+              <div style={{ fontWeight: 600 }}>
+                Найдено: {result.fetched} · Новых: {result.new} · Дубликатов: {result.duplicates}
+              </div>
+              <div className="auto-muted" style={{ fontSize: 13 }}>Снимите галочки с тех, что не нужны.</div>
+            </div>
+            <button type="button" className="auto-btn auto-btn-success" onClick={importSelected} disabled={busy} data-testid="sources-import-btn">
+              Импортировать выбранные
+            </button>
+          </div>
+          <table className="auto-table" style={{ marginTop: 10 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 30 }}></th>
+                <th>Название</th><th>Год</th><th>Цена</th><th>URL</th><th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(result.items || []).map((it, i) => {
+                const v = it.vehicle || {};
+                const ref = v.source_reference || `idx-${i}`;
+                return (
+                  <tr key={ref} data-testid={`sources-row-${ref}`}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={!!selected[ref]}
+                        onChange={(e) => setSelected({ ...selected, [ref]: e.target.checked })}
+                      />
+                    </td>
+                    <td>{v.title_ru || v.title_original || "?"}</td>
+                    <td>{v.year || "—"}</td>
+                    <td>{v.current_price_nzd ? `NZ$${v.current_price_nzd}` : "—"}</td>
+                    <td className="auto-muted" style={{ fontSize: 12, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {v.source_url ? (
+                        <a href={v.source_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--auto-primary)" }}>
+                          {v.source_url.slice(0, 60)}…
+                        </a>
+                      ) : "—"}
+                    </td>
+                    <td>
+                      {it.is_new
+                        ? <span className="auto-badge auto-badge-success">новый</span>
+                        : <span className="auto-badge auto-badge-warning">дубликат</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="auto-card">
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>История запусков</div>
+        {runs.length === 0 ? (
+          <div className="auto-muted">Запусков пока не было.</div>
+        ) : (
+          <table className="auto-table">
+            <thead><tr><th>Источник</th><th>Получено</th><th>Создано</th><th>Обновлено</th><th>Статус</th><th>Дата</th></tr></thead>
+            <tbody>
+              {runs.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.importer}</td>
+                  <td>{r.fetched}</td>
+                  <td>{r.created}</td>
+                  <td>{r.updated}</td>
+                  <td><span className="auto-badge">{r.sync_status}</span></td>
+                  <td>{r.finished_at ? new Date(r.finished_at).toLocaleString("ru-RU") : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BrandingTab() {
+  const [limit, setLimit] = useState(10);
+  const [force, setForce] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const run = async () => {
+    setBusy(true); setResult(null);
+    try {
+      const r = await autoApi.post("/admin/images/backfill-branding", { limit: Number(limit || 10), force });
+      setResult(r.data);
+    } catch (e) {
+      setResult({ error: e.response?.data?.detail || String(e) });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 14 }} data-testid="admin-branding">
+      <div className="auto-card">
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>Брендирование фотографий АвтоРесурс</div>
+        <p className="auto-muted" style={{ fontSize: 13, marginBottom: 12 }}>
+          Скачиваем исходное фото, добавляем шапку с логотипом и подпись «Источник: …» в подвале, сохраняем как локальное брендированное фото.
+          Третьи логотипы не удаляются. По умолчанию обрабатываются только автомобили, у которых ещё нет brended-фото.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "100px auto auto", gap: 10, alignItems: "center" }}>
+          <input className="auto-input" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} data-testid="branding-limit" />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-testid="branding-force" />
+            <span>Переобработать существующие</span>
+          </label>
+          <button type="button" className="auto-btn" onClick={run} disabled={busy} data-testid="branding-run-btn">
+            {busy ? "Обрабатываем…" : "Запустить брендирование"}
+          </button>
+        </div>
+      </div>
+      {result && (
+        <div className="auto-card" data-testid="branding-result">
+          {result.error ? (
+            <div className="auto-muted">Ошибка: {result.error}</div>
+          ) : (
+            <>
+              <div style={{ fontWeight: 600 }}>
+                Обработано автомобилей: {result.processed} · создано фото: {result.branded_images}
+              </div>
+              {result.errors?.length > 0 && (
+                <details style={{ marginTop: 8 }}>
+                  <summary className="auto-muted">Ошибки ({result.errors.length})</summary>
+                  <pre style={{ fontSize: 12, overflowX: "auto" }}>{JSON.stringify(result.errors, null, 2)}</pre>
+                </details>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AuctionsTab() {
+  const [data, setData] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [c, s] = await Promise.all([
+        autoApi.get("/auctions/calendar", { params: { days_ahead: 21 } }),
+        autoApi.get("/admin/scheduler/status"),
+      ]);
+      setData(c.data);
+      setStatus(s.data);
+    } catch {}
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      await autoApi.post("/admin/auctions/refresh", { categories: ["cars"] });
+      await load();
+    } catch (e) { alert(e.response?.data?.detail || "Ошибка."); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 14 }} data-testid="admin-auctions">
+      <div className="auto-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <div style={{ fontWeight: 600 }}>Календарь аукционов</div>
+            <div className="auto-muted" style={{ fontSize: 13 }}>
+              Автообновление: {status?.running ? "✓ включено" : "✗ выключено"}
+              {status?.last_run_at && ` · последний запуск ${new Date(status.last_run_at).toLocaleString("ru-RU")}`}
+              {data && ` · сейчас в базе: ${data.count} событий`}
+            </div>
+          </div>
+          <button type="button" className="auto-btn" onClick={refresh} disabled={busy} data-testid="auctions-refresh-admin-btn">
+            {busy ? "Обновляем…" : "Обновить сейчас"}
+          </button>
+        </div>
+      </div>
+      {data?.by_day?.length > 0 && (
+        <div className="auto-card">
+          <table className="auto-table">
+            <thead><tr><th>Дата</th><th>Аукционов</th><th>Лотов</th><th>Города</th></tr></thead>
+            <tbody>
+              {data.by_day.map((d) => (
+                <tr key={d.date}>
+                  <td>{d.date}</td>
+                  <td>{d.events}</td>
+                  <td style={{ fontWeight: 700 }}>{d.lots}</td>
+                  <td className="auto-muted">{d.cities.join(", ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

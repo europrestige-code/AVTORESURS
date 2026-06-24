@@ -190,52 +190,82 @@ class SourceImporter(ABC):
 # ---------- concrete importers ----------
 
 class TurnersImporter(SourceImporter):
-    """Turners NZ. Uses the public sitemap or category index as a starting
-    point. If the structure changes, the importer reports sync_status=failed."""
+    """Turners NZ. Uses the auction calendar collection (populated by the
+    AuctionCalendarService) as starting points, then crawls per-auction pages.
+    Falls back to the public branch index pages if the calendar is empty."""
 
     name = "turners"
     country = AutoCountry.NZ
     listing_type = AutoListingType.AUCTION
     base_url = "https://www.turners.co.nz"
 
+    def __init__(self, ai=None, db=None):
+        super().__init__(ai=ai)
+        self.db = db
+
     async def fetch_vehicles(self, limit: int = 20) -> List[Dict[str, Any]]:
         items: List[Dict[str, Any]] = []
-        # Public, lightweight starting points (no aggressive scraping).
-        candidates = [
-            f"{self.base_url}/cars/used-cars-for-sale",
-        ]
-        for url in candidates:
+        # Strategy 1: use cached calendar (admin already runs daily refresh)
+        auction_urls: List[str] = []
+        if self.db is not None:
+            try:
+                async for ev in self.db.auto_auction_calendar.find(
+                    {"source": "turners"}
+                ).sort("starts_at", 1).limit(20):
+                    if ev.get("auction_url"):
+                        auction_urls.append(ev["auction_url"])
+            except Exception:
+                pass
+        # Strategy 2: fall back to branch index pages if no calendar data
+        if not auction_urls:
+            from services.auto_auctions_service import TURNERS_BRANCH_URLS
+            auction_urls = list(TURNERS_BRANCH_URLS)[:6]
+        for url in auction_urls:
+            if len(items) >= limit:
+                break
             html = await self._get(url)
             if not html:
                 continue
-            items.extend(self._parse_listing_index(html, url))
-            if len(items) >= limit:
-                break
-        return items[:limit]
+            items.extend(self._parse_auction_page(html, url))
+        # De-duplicate by source_url
+        seen = set()
+        deduped = []
+        for it in items:
+            key = it.get("source_url") or it.get("source_reference")
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(it)
+        return deduped[:limit]
 
-    def _parse_listing_index(self, html: str, base: str) -> List[Dict[str, Any]]:
+    def _parse_auction_page(self, html: str, base: str) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(html, "lxml")
         results: List[Dict[str, Any]] = []
-        # Heuristic: look for product cards (links containing "/cars/")
         seen = set()
+        # Look for product anchors (Turners stock items live at /Cars/Used-Cars-for-Sale/<slug>/)
         for a in soup.select("a"):
             href = a.get("href") or ""
-            if "/cars/" not in href:
+            if not href:
+                continue
+            if not any(p in href for p in ("/Used-Cars-for-Sale/", "/cars/used-cars-for-sale/")):
                 continue
             full = href if href.startswith("http") else f"{self.base_url}{href}"
-            if full in seen or full == base:
+            if full in seen:
                 continue
             text = _norm(a.get_text(" ", strip=True))
-            if not text or len(text) < 12:
+            if not text or len(text) < 8:
                 continue
-            ref = re.search(r"/(\d{4,})(?:/|$)", full)
+            ref_m = re.search(r"/(\d{4,})(?:/|$)", full)
+            year_m = YEAR_RE.search(text)
+            price_m = PRICE_RE.search(text)
+            seen.add(full)
             results.append({
                 "source_url": full,
-                "source_reference": ref.group(1) if ref else None,
+                "source_reference": ref_m.group(1) if ref_m else None,
                 "title": text[:160],
-                "year": int(YEAR_RE.search(text).group(0)) if YEAR_RE.search(text) else None,
+                "year": int(year_m.group(0)) if year_m else None,
+                "current_price_nzd": _to_float(price_m.group(1)) if price_m else None,
             })
-            seen.add(full)
         return results
 
 

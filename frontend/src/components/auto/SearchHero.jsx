@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import autoApi from "../../services/autoApi";
+import { Car, CreditCard, Wrench, Recycle, CalendarDays, Cog, Bike } from "lucide-react";
 
 const BODY_TYPE_LABEL = {
   Кабриолет: "Кабриолет",
@@ -15,13 +16,13 @@ const BODY_TYPE_LABEL = {
 };
 
 const CATEGORIES = [
-  { key: "auctions", label: "Аукционы", route: "/auto/auctions-list", icon: "🏁" },
-  { key: "buynow", label: "Купить сейчас", route: "/auto/buynow", icon: "💳" },
-  { key: "damaged", label: "Повреждённые", route: "/auto/damaged", icon: "🛠️" },
-  { key: "eol", label: "End of Life", route: "/auto/end-of-life", icon: "♻️" },
-  { key: "calendar", label: "Календарь", route: "/auto/auctions", icon: "📅" },
-  { key: "parts", label: "Запчасти", route: "/auto/parts", icon: "🔧", soon: true },
-  { key: "moto", label: "Мотоциклы", filter: { body_type: "Мотоцикл" }, icon: "🏍️", soon: true },
+  { key: "auctions", label: "Аукционы",      route: "/auto/auctions-list", Icon: Car },
+  { key: "buynow",   label: "Купить сейчас", route: "/auto/buynow",        Icon: CreditCard },
+  { key: "damaged",  label: "Повреждённые",  route: "/auto/damaged",       Icon: Wrench },
+  { key: "eol",      label: "End of Life",   route: "/auto/end-of-life",   Icon: Recycle },
+  { key: "calendar", label: "Календарь",     route: "/auto/auctions",      Icon: CalendarDays },
+  { key: "parts",    label: "Запчасти",      route: "/auto/parts",         Icon: Cog,  soon: true },
+  { key: "moto",     label: "Мотоциклы",                                   Icon: Bike, soon: true },
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -135,24 +136,29 @@ export default function SearchHero({ variant = "home" }) {
 
       {/* Category tiles */}
       <div className="auto-search-hero__cats" data-testid="search-categories">
-        {CATEGORIES.map((c) => (
-          <button
-            key={c.key}
-            type="button"
-            onClick={() => {
-              if (c.soon) return;
-              if (c.route) navigate(c.route);
-              else if (c.filter) goWith(c.filter);
-            }}
-            className="auto-cat-tile"
-            disabled={c.soon}
-            data-testid={`search-cat-${c.key}`}
-          >
-            <span className="auto-cat-tile__icon" aria-hidden>{c.icon}</span>
-            <span className="auto-cat-tile__label">{c.label}</span>
-            {c.soon && <span className="auto-badge">скоро</span>}
-          </button>
-        ))}
+        {CATEGORIES.map((c) => {
+          const Icon = c.Icon;
+          return (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => {
+                if (c.soon) return;
+                if (c.route) navigate(c.route);
+                else if (c.filter) goWith(c.filter);
+              }}
+              className="auto-cat-tile"
+              disabled={c.soon}
+              data-testid={`search-cat-${c.key}`}
+            >
+              <span className="auto-cat-tile__icon" aria-hidden>
+                <Icon size={28} strokeWidth={1.7} />
+              </span>
+              <span className="auto-cat-tile__label">{c.label}</span>
+              {c.soon && <span className="auto-badge">скоро</span>}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
