@@ -28,12 +28,14 @@ const HERO_MAP_OVERLAY =
   "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2000&auto=format&fit=crop"; // earth/network feel
 
 const CATEGORY_IMAGES = {
-  // Verified Unsplash photo of a wrecked sedan (not the previous kitten id)
-  damaged:    "https://images.unsplash.com/photo-1591293836027-e05b48473b67?q=80&w=900&auto=format&fit=crop",
+  // User-supplied: smashed black Porsche 911 at an auction yard (IAA)
+  damaged:    "/branding/damaged-porsche.jpg",
   buynow:     "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=900&auto=format&fit=crop",
   commercial: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?q=80&w=900&auto=format&fit=crop",
   premium:    "https://images.unsplash.com/photo-1555215695-3004980ad54e?q=80&w=900&auto=format&fit=crop",
-  eol:        "https://images.unsplash.com/photo-1606577924006-27d39b132ae2?q=80&w=900&auto=format&fit=crop",
+  // Reuse the same wrecked-Porsche photo for EOL until a dedicated junkyard
+  // photo is supplied — visually consistent with the damaged tile.
+  eol:        "/branding/damaged-porsche.jpg",
 };
 
 /* Per-branch hero image. The user requested a relevant photo per Turners
