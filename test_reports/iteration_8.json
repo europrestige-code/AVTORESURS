@@ -1,0 +1,36 @@
+{
+  "summary": "Iter8 final pre-MVP regression — ALL acceptance criteria PASS. Backend pytest 18/18: (a) GET /api/auto/auctions/calendar?days_ahead=21 returns 47 events fully translated to RU — title (e.g. 'Большая среда — аукцион', 'JDM-спецификация', 'Северо-Запад Окленда Легковые — Понедельник 1:00pm — Все марки и модели $15,001 и выше'), branch (Гамильтон (Avalon Drive), Крайстчёрч (Hornby)) and city (Уонгареи, Нэйпир, Палмерстон-Норт) all in Cyrillic, with title_en/branch_en/city_en preserved. (b) /api/auto/body-type-counts returns exactly 8 canonical items {convertible, wagon, utility, coupe, hatchback, van, sedan, suv}. (c) /api/auto/vehicles?body_type={sedan,suv,hatchback} all return total>0 via alias regex. (d) Regression PASS: admin login, /api/auto/chat returns RU reply, /api/auto/admin/settings 200, /api/auto/my/deposit returns verified deposit for client@buyanywhere.com, /api/auto/deposit/stripe/session 200 with stripe checkout url (required body field origin_url). Frontend: /auto homepage shows the AR+АВТОРЕСУРС lockup image at 320×96px (>=220 width req) and ALL 9 sections render (hero, search-panel, body-type-strip-section, hot-daily, upcoming-auctions, why-us, popular-categories, lead-capture, bottom-features). 8 body-type chips render with MDI inline-SVG silhouettes; clicking Sedan navigates to /auto/catalog?body_type=sedan with aria-selected=true, second click strips the param. /auto/auctions calendar shows 26 day-cities + 47 event-branches + 47 event-city CityTag instances — every one wraps a lucide MapPin SVG (computed color rgb(0,102,255) = brand blue #0066FF) followed by the Russian city name. Vehicle 1f49c4c5… renders [data-testid=similar-lots] with 2 [data-testid^=similar-card-] cards. AutoFooter uses the same /branding/avtoresurs-lockup.png at 260×80px (~h-20). 0 console errors across /auto, /auto/catalog, /auto/auctions, /auto/vehicle/{id}. All prices RUB (₽). No NZ$ leak in calendar or vehicles API responses.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter8_regression.py",
+    "/app/test_reports/pytest/iter8.xml"
+  ],
+  "action_items": [
+    "(carried, not retested) iter5/6 auto_ru_customs_service.suggest_defaults_for_listing — damaged vehicle still returns is_non_runner=False per iter5 RCA. Code unchanged. Defer post-MVP.",
+    "(carried, not retested) auto_routes.py 1552 lines >700 guideline — refactor into sub-routers post-MVP."
+  ],
+  "critical_code_review_comments": [
+    "services/auto_auctions_i18n.py: re-compiling 50+ regex patterns on every translate call. Pre-compile TITLE_TERMS once at module import (re.compile) for ~10x faster /calendar response — negligible at current scale but a quick win.",
+    "services/auto_auctions_service.py:339 — `from services.auto_auctions_i18n import translate_event_doc` is inside the async loop function; move to module top-level imports (minor style/perf).",
+    "Frontend AutoLayout header lockup is loaded via plain <img src='/branding/avtoresurs-lockup.png'> — consider adding explicit width/height attributes to prevent CLS (currently sized 320×96).",
+    "BodyTypeStrip + CityTag both inline SVGs — fine, but the lucide MapPin in CityTag re-renders 120+ times on /auto/auctions; consider memoising or extracting a single <svg><symbol/></svg> sprite if calendar grows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter8_regression.py (NEW — 18 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (18/18 pytest)", "frontend": "100% — all 5 frontend acceptance areas pass (lockup, 9 sections, body-type chips toggle, CityTag MapPin, similar-lots, footer lockup)"},
+  "test_credentials": "admin@buyanywhere.com / admin12345; client@buyanywhere.com / client12345; client2@buyanywhere.com / client12345",
+  "seed_data_creation": "None — used existing seed",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter8 is the GREEN light for MVP launch. All iter8-scope deltas verified end-to-end: (1) RU calendar i18n via translate_event_doc — 47 events translated, *_en originals preserved; (2) Header+footer share /branding/avtoresurs-lockup.png (320×96 header, 260×80 footer); (3) MDI body-type silhouettes — 8 chips each w/ inline SVG path, click→aria-selected→URL param toggling works; (4) CityTag everywhere on /auto/auctions w/ lucide MapPin in brand-blue rgb(0,102,255). STRIPE_API_KEY + EMERGENT_LLM_KEY env vars are populated (chat returned a real LLM response, stripe session generated a real checkout url). REACT_APP_BACKEND_URL = production HTTPS preview URL. Zero console errors on all four /auto pages tested. Open carry-overs: damaged-vehicle non-runner default + auto_routes.py size — both NON-blocking for MVP launch.",
+  "rca of the issue": "N/A — no new issues found in iter8 scope."
+}

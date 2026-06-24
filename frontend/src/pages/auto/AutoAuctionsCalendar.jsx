@@ -1,8 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import autoApi from "../../services/autoApi";
 import { useAuth } from "../../contexts/AuthContext";
+import { MapPin } from "lucide-react";
 
 const DAY_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+function CityTag({ name, testid }) {
+  if (!name || name === "—") {
+    return <span className="auto-muted">—</span>;
+  }
+  return (
+    <span
+      data-testid={testid}
+      className="inline-flex items-center gap-1 whitespace-nowrap"
+      title="Место проведения аукциона (Новая Зеландия)"
+    >
+      <MapPin size={13} style={{ color: "var(--ar-blue, #0066ff)", flexShrink: 0 }} />
+      <span>{name}</span>
+    </span>
+  );
+}
 
 function parseISO(s) {
   if (!s) return null;
@@ -137,9 +154,13 @@ export default function AutoAuctionsCalendar() {
                 <div className="auctions-day__stats">
                   <div className="auctions-day__big">{d.stats.lots}</div>
                   <div className="auto-muted" style={{ fontSize: 11 }}>лотов · {d.stats.events} ауц.</div>
-                  <div className="auto-muted" style={{ fontSize: 11, marginTop: 4 }}>
-                    {d.stats.cities.slice(0, 2).join(", ")}
-                    {d.stats.cities.length > 2 ? `, +${d.stats.cities.length - 2}` : ""}
+                  <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5" style={{ fontSize: 11, marginTop: 4 }}>
+                    {d.stats.cities.slice(0, 2).map((c, i) => (
+                      <CityTag key={c} name={c} testid={`day-city-${d.date}-${i}`} />
+                    ))}
+                    {d.stats.cities.length > 2 && (
+                      <span className="auto-muted">+{d.stats.cities.length - 2}</span>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -178,9 +199,11 @@ export default function AutoAuctionsCalendar() {
                     <td>{dt ? dt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
                     <td style={{ maxWidth: 380 }}>
                       <div style={{ fontWeight: 600 }}>{e.title}</div>
-                      <div className="auto-muted" style={{ fontSize: 12 }}>{e.branch}</div>
+                      <div className="auto-muted" style={{ fontSize: 12 }}>
+                        <CityTag name={e.branch} testid={`event-branch-${e.key}`} />
+                      </div>
                     </td>
-                    <td>{e.city || "—"}</td>
+                    <td><CityTag name={e.city || "—"} testid={`event-city-${e.key}`} /></td>
                     <td style={{ fontWeight: 700 }}>{e.lots}</td>
                     <td>
                       {e.auction_url && (
