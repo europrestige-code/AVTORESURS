@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: buyanywhere-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: buyanywhere2024
+      MONGO_INITDB_DATABASE: buyanywhere_prod
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - buyanywhere-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: buyanywhere-backend
+    restart: unless-stopped
+    environment:
+      - MONGO_URL=mongodb://admin:buyanywhere2024@mongodb:27017/buyanywhere_prod?authSource=admin
+      - DB_NAME=buyanywhere_prod
+      - CORS_ORIGINS=https://rumarket.preview.emergentagent.com,http://localhost:3000
+      - EMERGENT_LLM_KEY=sk-emergent-f5a879eA455CdD819C
+    ports:
+      - "8001:8001"
+    depends_on:
+      - mongodb
+    networks:
+      - buyanywhere-network
+    volumes:
+      - ./backend:/app
+    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: buyanywhere-frontend
+    restart: unless-stopped
+    environment:
+      - REACT_APP_BACKEND_URL=https://rumarket.preview.emergentagent.com/api
+    ports:
+      - "3000:3000"
+    networks:
+      - buyanywhere-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm start
+
+  nginx:
+    image: nginx:alpine
+    container_name: buyanywhere-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - buyanywhere-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  buyanywhere-network:
+    driver: bridge

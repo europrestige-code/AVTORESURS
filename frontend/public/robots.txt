@@ -1,0 +1,44 @@
+# Robots.txt для BuyAnywhere.ru
+
+User-agent: *
+Allow: /
+
+# Yandex specific directives
+User-agent: Yandex
+Allow: /
+Crawl-delay: 1
+
+# Allow Google to crawl everything
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+# Block admin areas
+User-agent: *
+Disallow: /admin
+Disallow: /api/
+Disallow: /customer-dashboard/private
+Disallow: /*.json$
+Disallow: /uploads/private/
+
+# Allow public assets
+Allow: /static/
+Allow: /images/
+Allow: /css/
+Allow: /js/
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.png$
+Allow: /*.gif$
+Allow: /*.webp$
+Allow: /*.svg$
+Allow: /*.css$
+Allow: /*.js$
+
+# Sitemap location
+Sitemap: https://buyanywhere.ru/sitemap.xml
+Sitemap: https://buyanywhere.ru/sitemap-news.xml
+Sitemap: https://buyanywhere.ru/sitemap-products.xml
+
+# Host directive (for Yandex)
+Host: buyanywhere.ru

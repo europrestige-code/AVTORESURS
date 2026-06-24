@@ -1,0 +1,224 @@
+/* BuyAnywhere Auto — dark premium theme.
+ * Scoped to elements under .auto-root so it does not affect the rest of the app.
+ */
+
+.auto-root {
+  --auto-bg: #0b0b0b;
+  --auto-card: #171717;
+  --auto-card-hover: #1f1f1f;
+  --auto-border: #262626;
+  --auto-primary: #0066ff;
+  --auto-primary-hover: #3385ff;
+  --auto-text: #ffffff;
+  --auto-muted: #a0a0a0;
+  --auto-success: #00c853;
+  --auto-warning: #ff9800;
+  --auto-danger: #ff3b30;
+
+  background: var(--auto-bg);
+  color: var(--auto-text);
+  min-height: 100vh;
+  font-family: "Manrope", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.auto-root a {
+  color: var(--auto-text);
+}
+
+.auto-root .auto-muted {
+  color: var(--auto-muted);
+}
+
+.auto-root .auto-card {
+  background: var(--auto-card);
+  border: 1px solid var(--auto-border);
+  border-radius: 14px;
+  padding: 20px;
+  transition: transform 200ms ease, background 200ms ease, border-color 200ms ease;
+}
+
+.auto-root .auto-card:hover {
+  background: var(--auto-card-hover);
+}
+
+.auto-root .auto-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--auto-primary);
+  color: #ffffff;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.auto-root .auto-btn:hover {
+  background: var(--auto-primary-hover);
+}
+
+.auto-root .auto-btn:disabled {
+  background: #2a2a2a;
+  color: #6a6a6a;
+  cursor: not-allowed;
+}
+
+.auto-root .auto-btn-outline {
+  background: transparent;
+  border-color: var(--auto-border);
+  color: var(--auto-text);
+}
+
+.auto-root .auto-btn-outline:hover {
+  background: #1a1a1a;
+  border-color: #3a3a3a;
+}
+
+.auto-root .auto-btn-danger {
+  background: var(--auto-danger);
+}
+
+.auto-root .auto-btn-success {
+  background: var(--auto-success);
+  color: #0b0b0b;
+}
+
+.auto-root .auto-input,
+.auto-root .auto-select,
+.auto-root .auto-textarea {
+  background: #0e0e0e;
+  border: 1px solid var(--auto-border);
+  color: var(--auto-text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  width: 100%;
+  outline: none;
+  transition: border-color 180ms ease;
+}
+
+.auto-root .auto-input:focus,
+.auto-root .auto-select:focus,
+.auto-root .auto-textarea:focus {
+  border-color: var(--auto-primary);
+}
+
+.auto-root .auto-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #1f1f1f;
+  border: 1px solid var(--auto-border);
+}
+
+.auto-root .auto-badge-success { background: rgba(0, 200, 83, 0.12); color: var(--auto-success); border-color: rgba(0, 200, 83, 0.3); }
+.auto-root .auto-badge-warning { background: rgba(255, 152, 0, 0.12); color: var(--auto-warning); border-color: rgba(255, 152, 0, 0.3); }
+.auto-root .auto-badge-danger  { background: rgba(255, 59, 48, 0.12);  color: var(--auto-danger);  border-color: rgba(255, 59, 48, 0.3); }
+.auto-root .auto-badge-primary { background: rgba(0, 102, 255, 0.12);  color: var(--auto-primary); border-color: rgba(0, 102, 255, 0.3); }
+
+.auto-root .auto-divider {
+  height: 1px;
+  width: 100%;
+  background: var(--auto-border);
+  margin: 16px 0;
+}
+
+.auto-root .auto-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.auto-root .auto-table th,
+.auto-root .auto-table td {
+  text-align: left;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--auto-border);
+  font-size: 14px;
+}
+
+.auto-root .auto-table th {
+  color: var(--auto-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.auto-root .auto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.auto-root .auto-hero {
+  background:
+    radial-gradient(1200px 600px at 20% 0%, rgba(0,102,255,0.18), transparent 60%),
+    radial-gradient(900px 500px at 90% 30%, rgba(0,102,255,0.10), transparent 60%),
+    #0b0b0b;
+}
+
+.auto-root .auto-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--auto-border);
+}
+
+.auto-root .auto-nav a {
+  color: var(--auto-muted);
+  font-weight: 500;
+  font-size: 14px;
+  text-decoration: none;
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+}
+
+.auto-root .auto-nav a.active,
+.auto-root .auto-nav a:hover {
+  color: var(--auto-text);
+  border-bottom-color: var(--auto-primary);
+}
+
+.auto-root .auto-image {
+  background: #0a0a0a;
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+}
+
+.auto-root .auto-placeholder {
+  background: linear-gradient(135deg, #1a1a1a, #0a0a0a);
+  width: 100%;
+  aspect-ratio: 4/3;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--auto-muted);
+  font-size: 14px;
+}
+
+.auto-root .auto-section {
+  padding: 48px 0;
+}
+
+.auto-root .auto-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+@media (max-width: 640px) {
+  .auto-root .auto-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .auto-root .auto-card { padding: 14px; }
+  .auto-root .auto-section { padding: 28px 0; }
+}
