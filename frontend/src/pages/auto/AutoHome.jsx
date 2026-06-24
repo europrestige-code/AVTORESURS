@@ -215,7 +215,7 @@ function Hero({ onView }) {
 
       <div className="relative mx-auto max-w-7xl px-6 py-24 lg:py-32">
         <div className="max-w-2xl">
-          <h1 className="text-5xl font-black leading-[1.05] tracking-tight md:text-6xl lg:text-7xl">
+          <h1 className="text-3xl font-black leading-[1.05] tracking-tight md:text-4xl lg:text-5xl">
             Автомобили <br />
             <span className="text-white">со всего мира</span>
           </h1>

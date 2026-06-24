@@ -33,11 +33,11 @@ export default function AutoLayout() {
       {/* Sticky main header */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#05070B]/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
-          <NavLink to="/auto" end className="flex items-center gap-3" data-testid="auto-brand">
+          <NavLink to="/auto" end className="flex items-center gap-4" data-testid="auto-brand">
             <img
               src="/branding/avtoresurs-mark.png"
               alt="АвтоРесурс"
-              className="h-10 w-12 rounded-xl object-cover bg-blue-600"
+              className="h-[120px] w-[140px] rounded-xl object-cover bg-blue-600"
             />
             <div>
               <div className="text-lg font-black italic tracking-wide leading-none">
