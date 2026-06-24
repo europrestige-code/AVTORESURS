@@ -2,83 +2,100 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import autoApi from "../../services/autoApi";
 
-/* Eight minimalist body-shape silhouettes — drawn from the same family so
- * they share line weight, baseline, and bounding box. They're inline SVG
- * (no external dependency) and inherit `currentColor` so the active/idle
- * state can be themed via Tailwind text colour. */
+/* Professional filled side-profile silhouettes — modelled on real car body
+ * shapes. Each icon is a single filled path (body) + two wheel circles to
+ * keep things crisp at small sizes. Stroke-less for a clean Turners-like look.
+ * Unified 80×32 viewBox so every shape sits on the same ground line. */
 
 const ICONS = {
-  convertible: (p) => (
-    <svg viewBox="0 0 64 28" {...p}>
-      <path d="M8 21h48" />
-      <path d="M10 21l4-7c1-2 3-3 5-3h22c2 0 4 1 5 3l4 7" />
-      <circle cx="18" cy="22" r="3" />
-      <circle cx="46" cy="22" r="3" />
-      <path d="M19 11l4-3h12l4 3" strokeDasharray="2 2" />
-    </svg>
-  ),
-  wagon: (p) => (
-    <svg viewBox="0 0 64 28" {...p}>
-      <path d="M6 21h52" />
-      <path d="M8 21V14l8-7h32l8 7v7" />
-      <path d="M16 14h40" />
-      <path d="M30 7v7" />
-      <circle cx="18" cy="22" r="3" />
-      <circle cx="46" cy="22" r="3" />
-    </svg>
-  ),
-  utility: (p) => (
-    <svg viewBox="0 0 64 28" {...p}>
-      <path d="M6 21h52" />
-      <path d="M8 21v-7l5-7h14l3 7h28v7" />
-      <path d="M13 14h17" />
-      <circle cx="18" cy="22" r="3" />
-      <circle cx="46" cy="22" r="3" />
-    </svg>
-  ),
-  coupe: (p) => (
-    <svg viewBox="0 0 64 28" {...p}>
-      <path d="M6 21h52" />
-      <path d="M8 21l3-7c1-2 3-3 5-3l8-6c2-1 4-1 6 0l14 9h12v7" />
-      <circle cx="18" cy="22" r="3" />
-      <circle cx="46" cy="22" r="3" />
-    </svg>
-  ),
-  hatchback: (p) => (
-    <svg viewBox="0 0 64 28" {...p}>
-      <path d="M6 21h52" />
-      <path d="M8 21v-7l6-7h20l12 7h10v7" />
-      <path d="M14 14h28" />
-      <circle cx="18" cy="22" r="3" />
-      <circle cx="46" cy="22" r="3" />
-    </svg>
-  ),
-  van: (p) => (
-    <svg viewBox="0 0 64 28" {...p}>
-      <path d="M6 21h52" />
-      <path d="M8 21V8h36l10 6v7" />
-      <path d="M14 12h26v6H14z" />
-      <circle cx="18" cy="22" r="3" />
-      <circle cx="46" cy="22" r="3" />
-    </svg>
-  ),
+  // Sedan — long bonnet, 3-box silhouette with separate boot.
   sedan: (p) => (
-    <svg viewBox="0 0 64 28" {...p}>
-      <path d="M6 21h52" />
-      <path d="M8 21l4-7 8-4h20l10 4 6 7" />
-      <path d="M16 14h28" />
-      <circle cx="18" cy="22" r="3" />
-      <circle cx="46" cy="22" r="3" />
+    <svg viewBox="0 0 80 32" {...p}>
+      <path d="M3 22h74v-3c0-1-1-2-2-2l-6-1-9-7c-1-1-3-2-5-2H32c-2 0-3 1-5 2l-9 5H8c-2 0-4 1-5 3l-2 3v2z M30 17l-7 4h17v-4H30z M43 17v4h17l-8-4H43z" />
+      <circle cx="20" cy="24" r="5" />
+      <circle cx="60" cy="24" r="5" />
+      <circle cx="20" cy="24" r="2" fill="#05070B" />
+      <circle cx="60" cy="24" r="2" fill="#05070B" />
     </svg>
   ),
+
+  // SUV — taller body, raised stance, near-vertical rear.
   suv: (p) => (
-    <svg viewBox="0 0 64 28" {...p}>
-      <path d="M6 21h52" />
-      <path d="M8 21V12l6-5h32l8 5v9" />
-      <path d="M14 12h40" />
-      <path d="M28 7v5" />
-      <circle cx="18" cy="22" r="3.2" />
-      <circle cx="46" cy="22" r="3.2" />
+    <svg viewBox="0 0 80 32" {...p}>
+      <path d="M2 21h76v-4c0-2-2-3-4-3h-3V8c0-1-1-2-3-2H22c-2 0-3 1-3 2v6h-9c-3 0-5 1-6 3l-2 2v2z M22 8h16v6H22V8z M40 8h14v6H40V8z" />
+      <circle cx="20" cy="24" r="5" />
+      <circle cx="60" cy="24" r="5" />
+      <circle cx="20" cy="24" r="2" fill="#05070B" />
+      <circle cx="60" cy="24" r="2" fill="#05070B" />
+    </svg>
+  ),
+
+  // Wagon — estate body, roofline extends all the way to the rear.
+  wagon: (p) => (
+    <svg viewBox="0 0 80 32" {...p}>
+      <path d="M2 21h76v-3c0-1-1-2-2-2h-4V9c0-1-1-2-2-2H24c-2 0-3 1-4 2l-5 7H8c-3 0-5 2-6 3v2z M24 9h14v7H24V9z M40 9h26v7H40V9z" />
+      <circle cx="20" cy="24" r="5" />
+      <circle cx="60" cy="24" r="5" />
+      <circle cx="20" cy="24" r="2" fill="#05070B" />
+      <circle cx="60" cy="24" r="2" fill="#05070B" />
+    </svg>
+  ),
+
+  // Hatchback — compact body, steep sloping liftgate at the rear.
+  hatchback: (p) => (
+    <svg viewBox="0 0 80 32" {...p}>
+      <path d="M3 21h70v-3c0-1-1-2-2-2l-5-1-7-7c-1-1-2-2-4-2H26c-2 0-4 1-5 3l-5 7H10c-3 0-5 1-6 3l-1 2z M28 11l-5 5h14v-5H28z M40 11v5h22l-5-5H40z" />
+      <circle cx="20" cy="24" r="5" />
+      <circle cx="58" cy="24" r="5" />
+      <circle cx="20" cy="24" r="2" fill="#05070B" />
+      <circle cx="58" cy="24" r="2" fill="#05070B" />
+    </svg>
+  ),
+
+  // Coupe — 2-door, low sleek fastback profile.
+  coupe: (p) => (
+    <svg viewBox="0 0 80 32" {...p}>
+      <path d="M3 22h74v-3c0-1-1-2-2-2l-4-1-11-9c-2-1-4-2-7-2H30c-2 0-4 1-5 2l-10 7H10c-3 0-5 1-7 3v5z M30 16l8-6h8c2 0 3 1 5 2l9 4H30z" />
+      <circle cx="20" cy="24" r="5" />
+      <circle cx="60" cy="24" r="5" />
+      <circle cx="20" cy="24" r="2" fill="#05070B" />
+      <circle cx="60" cy="24" r="2" fill="#05070B" />
+    </svg>
+  ),
+
+  // Convertible — open top, low slung, no roof line.
+  convertible: (p) => (
+    <svg viewBox="0 0 80 32" {...p}>
+      <path d="M3 22h74v-3c0-1-1-2-2-2l-6-1-7-3c-2-1-4-2-7-2H34c-2 0-4 1-6 2l-10 5h-8c-3 0-5 1-6 2l-1 2z" />
+      {/* windshield + roll bar hint */}
+      <path d="M36 12l-3 5h6v-5h-3z" />
+      <path d="M50 11v6h5l-2-4-3-2z" />
+      <circle cx="20" cy="24" r="5" />
+      <circle cx="60" cy="24" r="5" />
+      <circle cx="20" cy="24" r="2" fill="#05070B" />
+      <circle cx="60" cy="24" r="2" fill="#05070B" />
+    </svg>
+  ),
+
+  // Van — tall single-box body, square back, sliding door hint.
+  van: (p) => (
+    <svg viewBox="0 0 80 32" {...p}>
+      <path d="M2 21h76v-4c0-2-2-3-4-3V7c0-1-1-2-3-2H17c-2 0-3 1-3 2v7h-3c-3 0-5 1-6 3l-3 2v2z M17 7h26v7H17V7z M45 7h21v7H45V7z" />
+      <circle cx="20" cy="24" r="5" />
+      <circle cx="62" cy="24" r="5" />
+      <circle cx="20" cy="24" r="2" fill="#05070B" />
+      <circle cx="62" cy="24" r="2" fill="#05070B" />
+    </svg>
+  ),
+
+  // Utility — short cab + flat open cargo bed at the rear.
+  utility: (p) => (
+    <svg viewBox="0 0 80 32" {...p}>
+      <path d="M2 21h76v-3c0-1-1-2-2-2H40v-4c0-2-1-3-3-3H22c-2 0-3 1-3 3v4h-7c-3 0-5 1-6 3l-3 2v0z M22 9h15v7H22V9z M40 16h36v3l-2 2H40v-5z" />
+      <circle cx="20" cy="24" r="5" />
+      <circle cx="60" cy="24" r="5" />
+      <circle cx="20" cy="24" r="2" fill="#05070B" />
+      <circle cx="60" cy="24" r="2" fill="#05070B" />
     </svg>
   ),
 };
@@ -88,13 +105,9 @@ function Icon({ id, className = "" }) {
   if (!Cmp) return null;
   return (
     <Cmp
-      width="56"
+      width="60"
       height="24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fill="currentColor"
       className={className}
     />
   );

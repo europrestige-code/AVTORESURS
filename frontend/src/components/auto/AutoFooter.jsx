@@ -40,17 +40,13 @@ export default function AutoFooter() {
       <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-5">
         {/* Brand + contacts */}
         <div className="lg:col-span-2">
-          <Link to="/auto" className="flex items-center gap-3" data-testid="footer-brand">
-            <div className="flex h-11 w-12 items-center justify-center rounded-xl bg-blue-600 text-white font-black">AR</div>
-            <div>
-              <div className="text-lg font-black italic tracking-wide">
-                <span className="text-white">АВТО</span>
-                <span className="text-blue-500">РЕСУРС</span>
-              </div>
-              <div className="text-[10px] uppercase tracking-[0.25em] text-gray-400">
-                автомобили со всего мира
-              </div>
-            </div>
+          <Link to="/auto" className="inline-block" data-testid="footer-brand">
+            <img
+              src="/branding/avtoresurs-lockup.png?v=3"
+              alt="АвтоРесурс — автомобили со всего мира"
+              className="h-20 w-auto select-none"
+              draggable="false"
+            />
           </Link>
           <p className="mt-4 max-w-sm text-sm text-gray-400">
             Покупаем авто на аукционах Новой Зеландии и Австралии, инспектируем,
