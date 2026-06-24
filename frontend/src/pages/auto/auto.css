@@ -1,24 +1,70 @@
 /* BuyAnywhere Auto — dark premium theme.
  * Scoped to elements under .auto-root so it does not affect the rest of the app.
+ *
+ * Brand Book v1.0 (АвтоРесурс) — design tokens below.
+ *   Fonts:   Montserrat (logo + headings), Inter (body + UI numbers)
+ *   Colours: #0066FF primary, #3385FF hover, #05070B bg, #0D111A card,
+ *            #111827 panel, #FFFFFF text, #A0A0A0 muted,
+ *            #00C853 success, #FF9800 warning, #FF3B30 danger
+ *   Radius:  12 (buttons), 16 (cards), 24 (modals)
+ *   Hover:   transform: translateY(-2px)
  */
 
-.auto-root {
-  --auto-bg: #0b0b0b;
-  --auto-card: #171717;
-  --auto-card-hover: #1f1f1f;
-  --auto-border: #262626;
-  --auto-primary: #0066ff;
-  --auto-primary-hover: #3385ff;
-  --auto-text: #ffffff;
-  --auto-muted: #a0a0a0;
-  --auto-success: #00c853;
-  --auto-warning: #ff9800;
-  --auto-danger: #ff3b30;
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,800;1,700;1,800&family=Inter:wght@400;500;600;700&display=swap");
 
-  background: var(--auto-bg);
-  color: var(--auto-text);
+.auto-root {
+  /* ---- Colour tokens (Brand Book v1.0) ---- */
+  --ar-blue: #0066ff;
+  --ar-blue-hover: #3385ff;
+  --ar-black: #05070b;
+  --ar-card: #0d111a;
+  --ar-panel: #111827;
+  --ar-white: #ffffff;
+  --ar-grey: #a0a0a0;
+  --ar-success: #00c853;
+  --ar-warning: #ff9800;
+  --ar-danger: #ff3b30;
+
+  /* ---- Radius tokens ---- */
+  --ar-radius-btn: 12px;
+  --ar-radius-card: 16px;
+  --ar-radius-modal: 24px;
+
+  /* ---- Shadow tokens ---- */
+  --ar-shadow-primary: 0 10px 40px rgba(0, 102, 255, 0.15);
+
+  /* ---- Type tokens ---- */
+  --ar-font-logo: "Montserrat", "Inter", system-ui, sans-serif;
+  --ar-font-heading: "Montserrat", "Inter", system-ui, sans-serif;
+  --ar-font-body: "Inter", system-ui, sans-serif;
+
+  /* ---- Legacy aliases used across older components ---- */
+  --auto-bg: var(--ar-black);
+  --auto-card: var(--ar-card);
+  --auto-card-hover: #1a2030;
+  --auto-border: rgba(255, 255, 255, 0.08);
+  --auto-primary: var(--ar-blue);
+  --auto-primary-hover: var(--ar-blue-hover);
+  --auto-text: var(--ar-white);
+  --auto-muted: var(--ar-grey);
+  --auto-success: var(--ar-success);
+  --auto-warning: var(--ar-warning);
+  --auto-danger: var(--ar-danger);
+
+  background: var(--ar-black);
+  color: var(--ar-white);
   min-height: 100vh;
-  font-family: "Manrope", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--ar-font-body);
+  font-feature-settings: "ss01", "ss02", "cv11";
+}
+
+.auto-root h1,
+.auto-root h2,
+.auto-root h3,
+.auto-root h4 {
+  font-family: var(--ar-font-heading);
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .auto-root a {

@@ -34,9 +34,10 @@ export default function AutoLayout() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
           <NavLink to="/auto" end className="flex items-center" data-testid="auto-brand">
             <img
-              src="/branding/avtoresurs-lockup.png"
+              src="/branding/avtoresurs-lockup.png?v=2"
               alt="АвтоРесурс — автомобили со всего мира"
-              className="h-12 w-auto select-none lg:h-14"
+              className="h-14 w-auto select-none lg:h-16"
+              style={{ minWidth: 220 }}
               draggable="false"
             />
           </NavLink>
