@@ -336,13 +336,14 @@ class AuctionCalendarService:
         horizon = datetime.utcnow() + timedelta(days=days_ahead)
         query["starts_at"] = {"$gte": cutoff, "$lte": horizon}
         out: List[Dict[str, Any]] = []
+        from services.auto_auctions_i18n import translate_event_doc
         async for d in self.db.auto_auction_calendar.find(query).sort("starts_at", 1):
             d.pop("_id", None)
             if isinstance(d.get("starts_at"), datetime):
                 d["starts_at"] = d["starts_at"].isoformat()
             if isinstance(d.get("fetched_at"), datetime):
                 d["fetched_at"] = d["fetched_at"].isoformat()
-            out.append(d)
+            out.append(translate_event_doc(d))
         return out
 
     async def summary_by_day(self, days_ahead: int = 21) -> List[Dict[str, Any]]:

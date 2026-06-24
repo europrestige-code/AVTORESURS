@@ -2,7 +2,6 @@ import React from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { User } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-import QuickCategoryStrip from "../../components/auto/QuickCategoryStrip";
 import ChatWidget from "../../components/auto/ChatWidget";
 import ContactsBar from "../../components/auto/ContactsBar";
 import AutoFooter from "../../components/auto/AutoFooter";
@@ -13,7 +12,7 @@ const NAV = [
   { to: "/auto/catalog",                    label: "Каталог" },
   { to: "/auto/auctions",                   label: "Календарь аукционов" },
   { to: "/auto/damaged",                    label: "Повреждённые" },
-  { to: "/auto/end-of-life",                label: "Списанные авто" },
+  { to: "/auto/end-of-life",                label: "End of Life" },
   { to: "/auto/buynow",                     label: "Купить сейчас" },
   { to: "/auto/fees",                       label: "Услуги" },
   { to: "/auto/terms",                      label: "О компании" },
@@ -33,31 +32,23 @@ export default function AutoLayout() {
       {/* Sticky main header */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#05070B]/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
-          <NavLink to="/auto" end className="flex items-center gap-4" data-testid="auto-brand">
+          <NavLink to="/auto" end className="flex items-center" data-testid="auto-brand">
             <img
-              src="/branding/avtoresurs-mark.png"
-              alt="АвтоРесурс"
-              className="h-16 w-16 rounded-xl object-cover bg-blue-600"
+              src="/branding/avtoresurs-lockup.png"
+              alt="АвтоРесурс — автомобили со всего мира"
+              className="h-12 w-auto select-none lg:h-14"
+              draggable="false"
             />
-            <div className="flex flex-col justify-center" style={{ height: "64px" }}>
-              <div className="text-3xl font-black italic tracking-wide leading-none">
-                <span className="text-white">АВТО</span>
-                <span className="text-blue-500">РЕСУРС</span>
-              </div>
-              <div className="mt-2 text-[10px] uppercase tracking-[0.25em] text-gray-400">
-                автомобили со всего мира
-              </div>
-            </div>
           </NavLink>
 
-          <nav className="hidden items-center gap-6 text-sm text-gray-300 lg:flex" aria-label="Главная навигация">
+          <nav className="hidden items-center gap-4 text-sm text-gray-300 lg:flex xl:gap-6" aria-label="Главная навигация">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
                 end={n.end}
                 className={({ isActive }) =>
-                  `pb-2 border-b-2 transition ${isActive ? "border-blue-500 text-white" : "border-transparent hover:text-white"}`
+                  `whitespace-nowrap pb-2 border-b-2 transition ${isActive ? "border-blue-500 text-white" : "border-transparent hover:text-white"}`
                 }
                 data-testid={`nav-${n.to.replace(/\//g, "-")}`}
               >
@@ -93,10 +84,6 @@ export default function AutoLayout() {
               </>
             )}
           </div>
-        </div>
-        {/* Quick category strip just under main nav */}
-        <div className="mx-auto max-w-7xl px-3">
-          <QuickCategoryStrip />
         </div>
       </header>
 

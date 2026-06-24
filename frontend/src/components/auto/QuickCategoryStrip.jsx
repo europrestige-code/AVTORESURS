@@ -25,7 +25,7 @@ const ITEMS = [
     to: "/auto/auctions-list",
     countKey: "auctions",
     photo:
-      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=600&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=600&auto=format&fit=crop",
   },
   {
     key: "buynow",
@@ -33,7 +33,7 @@ const ITEMS = [
     to: "/auto/buynow",
     countKey: "buynow",
     photo:
-      "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?q=80&w=600&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=600&auto=format&fit=crop",
   },
   {
     key: "damaged",
