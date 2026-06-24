@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 5 — Tested new FOB-only pricing flow, LandedPriceModal popup, Hot Daily section, AutoFooter, and updated chat. Backend: 7/7 pytest pass (hot-daily, ru-customs/calc full+invalid, landed-defaults, chat in Russian). Frontend: homepage redesign renders perfectly (Hero, SearchPanel, HotDaily with 2 cards Toyota Aqua + Nissan Leaf showing 🔥 ХИТ badge and FOB price, UpcomingAuctions, WhyUs, PopularCategories, LeadCapture, BottomFeatures, AutoFooter with logo+phones+social+legal). Sticky nav has all 8 items. LandedPriceModal opens from VehicleCard 'Под ключ в РФ' button on /auto/buynow, /auto/damaged, /auto/end-of-life, calculates totals (showed NZ$4,800 Honda Fit → 1 332 486 ₽ landed), live-recalculates on FOB change (4800→25000 → 2.85M ₽), non-runner toggle correctly auto-checks forklift (1 332 486 → 2 898 042 ₽). However the listing-specific default-preselect logic is BROKEN: DAMAGED and END_OF_LIFE vehicles both come up with all toggles=False and scheme=whole (should be non_runner+inspection+forklift=True for damaged, and non_runner+forklift+dismantling=True+scheme=parts for end-of-life). Verified via curl that GET /api/auto/vehicles/{damaged_id}/landed-defaults returns is_non_runner=false, inspection=false, forklift=false even though vehicle has condition='Повреждённое' / damage_type='Передний удар'. Root cause: suggest_defaults_for_listing() keys off listing_type which is 'auction' for all seeded vehicles — it needs to inspect damage_type/condition fields instead.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/auto/vehicles/{id}/landed-defaults",
+        "issue": "suggest_defaults_for_listing helper returns all-false toggles for damaged & end-of-life vehicles. The function appears to dispatch on listing_type (which is 'auction' for ALL seeded vehicles including damaged + end-of-life), but should branch on condition='Повреждённое'/'На запчасти' or damage_type. Reproduced: vehicle 9fdae724 has condition='Повреждённое' / damage_type='Передний удар' yet API returns is_non_runner=false, inspection=false, forklift=false, scheme=whole.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "LandedPriceModal preselect for DAMAGED & END_OF_LIFE listings",
+        "issue": "Modal opens with all extras unchecked and scheme=whole for every vehicle, regardless of damage state. Once backend /landed-defaults is fixed, frontend will pick them up automatically (front-end already reads d.is_non_runner / d.inspection / d.forklift / d.dismantling / d.scheme correctly).",
+        "affected_selectors": ["lm-nonrunner", "lm-inspection", "lm-forklift", "lm-dismantling", "lm-scheme"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_landed_hot.py",
+    "/app/test_reports/pytest/iter5_results.xml"
+  ],
+  "action_items": [
+    "Fix services/auto_ru_customs_service.suggest_defaults_for_listing to dispatch on damage_type/condition (or 'damaged'/'end_of_life' status flags) instead of (or in addition to) listing_type, since all current vehicles have listing_type='auction'. Expected behaviour: condition in ('Повреждённое',) OR damage_type non-empty → is_non_runner=True, inspection=True, forklift=True; condition='На запчасти' OR damage_type in ('Двигатель','Тотал') → scheme='parts', is_non_runner=True, forklift=True, dismantling=True.",
+    "Catalog (/auto/catalog) shows 12 vehicles but ALL have current_price_nzd=null, so 'FOB · NZ$—' renders and the 'Под ключ в РФ' button is hidden. Either seed catalog vehicles with prices or relax the `vehicle.current_price_nzd > 0` guard in VehicleCard to also show the button when buy_now_price_nzd is set."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/routes/auto_routes.py is now 1290+ lines — still well over the 700-line guideline; split into sub-routers (public, admin/vehicles, admin/sources, admin/stripe, chat) as recommended in iter3 and iter4.",
+    "auto_routes.py ru_customs_calc accepts is_non_runner/inspection/forklift/dismantling as bools via querystring — fine, but lacks a unit test in repo for the doubling effect of non_runner; iter5 covered this via integration test.",
+    "LandedPriceModal.jsx busy state is true while busy && !result shows 'Считаем…', but never clears if /ru-customs/calc returns 0 (e.g., empty branch + bad CC). Minor.",
+    "VehicleCard hides the 'Под ключ в РФ' button when current_price_nzd is null/0 — for fixed_price/buy-now listings the price may live in buy_now_price_nzd instead, so users on those cards miss the calculator (verified: catalog list shows '—' for all current_price_nzd values).",
+    "Hot Daily images all fall back to gradient initials because seeded vehicles have empty local_images/source_images — acceptable per problem statement but worth populating real photos for production polish."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_landed_hot.py (NEW)"
+  ],
+  "success_rate": { "backend": "100% (7/7 pytest pass)", "frontend": "85% — UI/layout/modal flow all green; preselect logic broken for damaged & end-of-life" },
+  "test_credentials": "admin@buyanywhere.com / admin12345 (admin), client@buyanywhere.com / client12345 (verified customer) — both confirmed working at POST /api/auth/login",
+  "seed_data_creation": "None (no DB writes during this iteration)",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All new endpoints verified via /app/backend/tests/test_landed_hot.py (passes). The remaining failure is the suggest_defaults_for_listing logic: vehicle 9fdae724-6330-4ee1-8853-f65a320a0a71 (condition='Повреждённое', damage_type='Передний удар', listing_type='auction') should return is_non_runner+inspection+forklift=True but returns all False. After main agent fixes the helper, smoke-test by opening /auto/damaged → click 'Под ключ в РФ' on first card → assert lm-nonrunner is_checked()=True. Similarly /auto/end-of-life should preselect scheme='parts' + dismantling+non_runner+forklift True. Catalog (/auto/catalog) hides Под ключ buttons because seeded auction vehicles have null current_price_nzd; consider widening guard or seeding prices.",
+  "rca of the issue": "Backend helper services/auto_ru_customs_service.suggest_defaults_for_listing(listing_type, damage_type, condition) is invoked with listing_type='auction' for ALL seeded vehicles (including damaged ones), so the function's primary dispatch likely keys on listing_type='DAMAGED'/'END_OF_LIFE' which never matches. Need to either (a) make the dispatch primarily check condition/damage_type, or (b) ensure seed data uses listing_type='damaged'/'end_of_life' as the categorisation. Reproduction: `curl /api/auto/vehicles/9fdae724-6330-4ee1-8853-f65a320a0a71/landed-defaults` returns is_non_runner=false."
+}

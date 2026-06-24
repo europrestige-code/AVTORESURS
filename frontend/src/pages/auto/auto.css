@@ -668,3 +668,42 @@
   .auto-root .chat-fab { padding: 14px; bottom: 80px; }
   .auto-root .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 80px; height: 70vh; }
 }
+
+/* --- Landed Price Modal --- */
+.landed-modal__backdrop {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 7, 11, 0.78);
+  backdrop-filter: blur(6px);
+  padding: 20px;
+}
+.landed-modal__panel {
+  width: min(720px, 100%);
+  max-height: 90vh; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: #0D111A;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  box-shadow: 0 40px 80px -20px rgba(0,0,0,0.7);
+}
+.landed-modal__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, #131722 0%, #0D111A 100%);
+}
+.landed-modal__body {
+  padding: 20px; overflow-y: auto;
+}
+
+/* Vehicle card actions row (Подробнее + Под ключ) */
+.auto-root .vehicle-card__actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin-top: 12px;
+}
+.auto-root .vehicle-card__actions .auto-btn { width: 100%; padding: 9px 10px; font-size: 13px; }
+.auto-root .auto-btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(0, 102, 255, 0.45);
+  color: #3385FF;
+}
+.auto-root .auto-btn--ghost:hover { background: rgba(0, 102, 255, 0.1); }

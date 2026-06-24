@@ -123,7 +123,7 @@ class SourceImporter(ABC):
     country: AutoCountry = AutoCountry.NZ
     listing_type: AutoListingType = AutoListingType.AUCTION
     base_url: Optional[str] = None
-    user_agent: str = "AvtoResursBot/1.0 (+https://avtoresurs)"
+    user_agent: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 
     def __init__(self, ai: Optional[AutoAIService] = None):
         self.ai = ai
@@ -270,78 +270,188 @@ class TurnersImporter(SourceImporter):
 
 
 class ManheimImporter(SourceImporter):
-    """Manheim NZ. Falls back gracefully if the public index is unavailable."""
+    """Manheim NZ — parses public search pages (passenger + damaged).
+
+    Each card has `.vehicle-card` with:
+      - h2  → "<year> <make> <model> <body>"
+      - a   → "/<category>/<numeric_id>/<slug>?..."  (source_reference = numeric_id)
+      - img → CDN image (img.manheim.com.au)
+      - body text contains location, lot, starting bid, odometer, etc.
+    """
 
     name = "manheim"
     country = AutoCountry.NZ
     listing_type = AutoListingType.AUCTION
     base_url = "https://www.manheim.co.nz"
 
+    SEARCH_PAGES = [
+        ("/passenger-vehicles/search", AutoListingType.AUCTION, None),
+        ("/damaged-vehicles/search",   AutoListingType.AUCTION, "damaged"),
+    ]
+
+    # 2016 Nissan Leaf Hatch  →  year=2016 make=Nissan model="Leaf Hatch"
+    _TITLE_RE = re.compile(r"^\s*(19|20)(\d{2})\s+([A-Za-z\-]+)\s+(.+?)\s*$")
+    _ODO_RE   = re.compile(r"([\d,]{2,})\s*KM", re.IGNORECASE)
+    _BID_RE   = re.compile(r"\$\s*([\d,]+)\s*Starting\s*Bid", re.IGNORECASE)
+
     async def fetch_vehicles(self, limit: int = 20) -> List[Dict[str, Any]]:
-        html = await self._get(f"{self.base_url}/")
-        if not html:
-            return []
-        soup = BeautifulSoup(html, "lxml")
         results: List[Dict[str, Any]] = []
-        seen = set()
-        for a in soup.select("a"):
-            href = a.get("href") or ""
-            if not any(k in href for k in ("/vehicle/", "/lot/", "/listing/")):
-                continue
-            full = href if href.startswith("http") else f"{self.base_url}{href}"
-            if full in seen:
-                continue
-            text = _norm(a.get_text(" ", strip=True))
-            if not text:
-                continue
-            ref = re.search(r"/(\d{4,})", full)
-            results.append({
-                "source_url": full,
-                "source_reference": ref.group(1) if ref else None,
-                "title": text[:160],
-            })
-            seen.add(full)
+        seen: set = set()
+        for path, ltype, damage_hint in self.SEARCH_PAGES:
             if len(results) >= limit:
                 break
-        return results
+            html = await self._get(f"{self.base_url}{path}")
+            if not html:
+                continue
+            results.extend(self._parse_search(html, ltype, damage_hint, seen, limit - len(results)))
+        return results[:limit]
+
+    def _parse_search(self, html: str, ltype: AutoListingType,
+                       damage_hint: Optional[str], seen: set, remaining: int) -> List[Dict[str, Any]]:
+        soup = BeautifulSoup(html, "lxml")
+        out: List[Dict[str, Any]] = []
+        for card in soup.select(".vehicle-card"):
+            if len(out) >= remaining:
+                break
+            a = card.select_one("a[href]")
+            if not a:
+                continue
+            href = a.get("href") or ""
+            full = href if href.startswith("http") else f"{self.base_url}{href}"
+            ref_m = re.search(r"/(\d{6,})(?:/|$)", full)
+            ref = ref_m.group(1).lstrip("0") if ref_m else None
+            key = ref or full
+            if key in seen:
+                continue
+            seen.add(key)
+            title_el = card.select_one("h2")
+            title = _norm(title_el.get_text(" ", strip=True)) if title_el else None
+            year = make = model = body = None
+            if title:
+                tm = self._TITLE_RE.match(title)
+                if tm:
+                    year = int(f"{tm.group(1)}{tm.group(2)}")
+                    make = tm.group(3)
+                    rest = tm.group(4)
+                    parts = rest.split()
+                    body = parts[-1] if len(parts) > 1 else None
+                    model = " ".join(parts[:-1]) if body and len(parts) > 1 else rest
+            text = card.get_text(" ", strip=True)
+            odo_m = self._ODO_RE.search(text)
+            bid_m = self._BID_RE.search(text)
+            # Location: usually "Suburb, City, Region"
+            loc_m = re.search(r"([A-Z][A-Za-z\s]+?,\s*[A-Z][A-Za-z\s]+?,\s*[A-Z][A-Za-z\s]+?Island)", text)
+            img_el = card.select_one("img")
+            img_url = (img_el.get("src") or img_el.get("data-src")) if img_el else None
+            out.append({
+                "source_url": full,
+                "source_reference": ref,
+                "title": title or "Manheim listing",
+                "year": year,
+                "make": make,
+                "model": model,
+                "body_type": body,
+                "mileage_km": int(odo_m.group(1).replace(",", "")) if odo_m else None,
+                "current_price_nzd": float(bid_m.group(1).replace(",", "")) if bid_m else None,
+                "location": _norm(loc_m.group(1)) if loc_m else None,
+                "damage_type": damage_hint,
+                "images": [img_url] if img_url else [],
+                "_listing_type": ltype,
+            })
+        return out
+
+    def normalise(self, raw: Dict[str, Any]) -> AutoVehicle:
+        v = super().normalise(raw)
+        # honour per-card listing type override
+        if raw.get("_listing_type"):
+            v.listing_type = raw["_listing_type"]
+        if raw.get("damage_type") == "damaged":
+            v.status = AutoVehicleStatus.AVAILABLE
+        return v
 
 
 class PicklesImporter(SourceImporter):
-    """Pickles AU (and select NZ inventory). Country defaults to AU; the
-    orchestrator may override per call."""
+    """Pickles AU — parses /cars/search grid cards.
+
+    Each card has `[class*='gridCard']` with:
+      - h2 → "<year> <make> <model>"
+      - a  → "/used/details/cars/<slug>/<stock_id>"
+      - img.src → CDN image
+      - card text contains: location, "<km> km", year, seats, fuel, transmission, "Stock <id>"
+    """
 
     name = "pickles"
     country = AutoCountry.AU
     listing_type = AutoListingType.INQUIRY_ONLY
     base_url = "https://www.pickles.com.au"
 
+    SEARCH_PAGES = [
+        "/cars/search",
+        "/used/search/category/passenger",
+    ]
+
+    _TITLE_RE = re.compile(r"^\s*(19|20)(\d{2})\s+([A-Za-z\-]+)\s+(.+?)\s*$")
+    _KM_RE    = re.compile(r"([\d,]{2,})\s*km\b", re.IGNORECASE)
+    _STOCK_RE = re.compile(r"Stock\s+(\d{4,})", re.IGNORECASE)
+    _LOC_RE   = re.compile(r"\b([A-Z][A-Za-z\s']+,\s*(?:NSW|VIC|QLD|SA|WA|TAS|ACT|NT))\b")
+
     async def fetch_vehicles(self, limit: int = 20) -> List[Dict[str, Any]]:
-        html = await self._get(f"{self.base_url}/used/search/category/passenger")
-        if not html:
-            return []
-        soup = BeautifulSoup(html, "lxml")
+        seen: set = set()
         results: List[Dict[str, Any]] = []
-        seen = set()
-        for a in soup.select("a"):
-            href = a.get("href") or ""
-            if "/item/" not in href and "/used/" not in href:
-                continue
-            full = href if href.startswith("http") else f"{self.base_url}{href}"
-            if full in seen or "search" in full:
-                continue
-            text = _norm(a.get_text(" ", strip=True))
-            if not text or len(text) < 8:
-                continue
-            ref = re.search(r"/(\d{4,})", full)
-            results.append({
-                "source_url": full,
-                "source_reference": ref.group(1) if ref else None,
-                "title": text[:160],
-            })
-            seen.add(full)
+        for path in self.SEARCH_PAGES:
             if len(results) >= limit:
                 break
-        return results
+            html = await self._get(f"{self.base_url}{path}")
+            if not html:
+                continue
+            results.extend(self._parse_search(html, seen, limit - len(results)))
+        return results[:limit]
+
+    def _parse_search(self, html: str, seen: set, remaining: int) -> List[Dict[str, Any]]:
+        soup = BeautifulSoup(html, "lxml")
+        out: List[Dict[str, Any]] = []
+        for card in soup.select("[class*='gridCard'], article[class*='Card']"):
+            if len(out) >= remaining:
+                break
+            a = card.select_one("a[href]")
+            if not a:
+                continue
+            href = a.get("href") or ""
+            full = href if href.startswith("http") else f"{self.base_url}{href}"
+            # /used/details/cars/<slug>/<id>
+            ref_m = re.search(r"/(\d{6,})(?:/|$|\?)", full)
+            ref = ref_m.group(1) if ref_m else None
+            key = ref or full
+            if key in seen:
+                continue
+            seen.add(key)
+            title_el = card.select_one("h2")
+            title = _norm(title_el.get_text(" ", strip=True)) if title_el else None
+            year = make = model = None
+            if title:
+                tm = self._TITLE_RE.match(title)
+                if tm:
+                    year = int(f"{tm.group(1)}{tm.group(2)}")
+                    make = tm.group(3)
+                    model = tm.group(4)
+            text = card.get_text(" ", strip=True)
+            km_m = self._KM_RE.search(text)
+            stock_m = self._STOCK_RE.search(text)
+            loc_m = self._LOC_RE.search(text)
+            img_el = card.select_one("img")
+            img_url = (img_el.get("src") or img_el.get("data-src")) if img_el else None
+            out.append({
+                "source_url": full,
+                "source_reference": ref or (stock_m.group(1) if stock_m else None),
+                "title": title or "Pickles listing",
+                "year": year,
+                "make": make,
+                "model": model,
+                "mileage_km": int(km_m.group(1).replace(",", "")) if km_m else None,
+                "location": _norm(loc_m.group(1)) if loc_m else None,
+                "images": [img_url] if img_url else [],
+            })
+        return out
 
 
 # Registry — easy to add a phase-2/3 source without touching call sites.

@@ -215,6 +215,155 @@ async def transport_pricing_endpoint():
     return {"runner_nzd_by_branch": list_branches()}
 
 
+@router.get("/ru-customs/calc")
+async def ru_customs_calc(
+    fob_nzd: float,
+    age_years: int = 5,
+    engine_cc: int = 2000,
+    engine_hp: int = 150,
+    importer_type: str = "personal",   # personal | commercial
+    scheme: str = "whole",              # whole | parts
+    include_nz_buyers_premium: bool = True,
+    include_avtoresurs_commission: bool = True,
+    # NZ-side extras
+    nz_branch: Optional[str] = None,
+    is_non_runner: bool = False,
+    inspection: bool = False,
+    forklift: bool = False,
+    dismantling: bool = False,
+    docs_fee: bool = True,
+    storage_days: int = 0,
+):
+    """Approximate Vladivostok-landed cost for a NZ vehicle (RUB + USD + NZD).
+
+    ⚠️ Quoted FOB prices on this site are auction-only. This endpoint adds
+    NZ buyer's premium, AvtoResurs commission, branch-aware local transport
+    (×2 if non-runner), optional inspection / forklift / dismantling / docs /
+    storage, ocean freight (shared 40-ft container, $5k per car), insurance,
+    Russian customs duty, VAT, excise (commercial) and утильсбор.
+    Result is INDICATIVE and can vary ±10–15%.
+    """
+    from services.auto_ru_customs_service import calculate_ru_landed_cost
+    if importer_type not in ("personal", "commercial"):
+        raise HTTPException(400, "importer_type must be 'personal' or 'commercial'")
+    if scheme not in ("whole", "parts"):
+        raise HTTPException(400, "scheme must be 'whole' or 'parts'")
+    if fob_nzd <= 0:
+        raise HTTPException(400, "fob_nzd must be positive")
+    res = calculate_ru_landed_cost(
+        fob_nzd=fob_nzd,
+        age_years=max(0, age_years),
+        engine_cc=max(0, engine_cc),
+        engine_hp=max(0, engine_hp),
+        importer_type=importer_type,   # type: ignore[arg-type]
+        scheme=scheme,                  # type: ignore[arg-type]
+        include_nz_buyers_premium=include_nz_buyers_premium,
+        include_avtoresurs_commission=include_avtoresurs_commission,
+        nz_branch=nz_branch,
+        is_non_runner=is_non_runner,
+        inspection=inspection,
+        forklift=forklift,
+        dismantling=dismantling,
+        docs_fee=docs_fee,
+        storage_days=max(0, storage_days),
+    )
+    return res.to_dict()
+
+
+@router.get("/vehicles/{vehicle_id}/landed-defaults")
+async def vehicle_landed_defaults(
+    vehicle_id: str,
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Return suggested defaults for the landed-price modal for this vehicle.
+
+    DAMAGED → non-runner + forklift + inspection ON, scheme = whole
+    END_OF_LIFE → non-runner + forklift + dismantling ON, scheme = parts
+    AUCTION (clean) → all extras OFF, scheme = whole
+    """
+    from services.auto_ru_customs_service import suggest_defaults_for_listing
+    v = await svc.db.auto_vehicles.find_one({"id": vehicle_id}, {"_id": 0})
+    if not v:
+        raise HTTPException(404, "Автомобиль не найден.")
+    # try to extract engine size from `engine` text like "2.0L" or "1998cc"
+    engine_cc = None
+    eng_txt = (v.get("engine") or "").lower()
+    import re as _re
+    m_cc = _re.search(r"(\d{3,4})\s*cc", eng_txt)
+    m_l = _re.search(r"(\d(?:\.\d+)?)\s*l", eng_txt)
+    if m_cc:
+        engine_cc = int(m_cc.group(1))
+    elif m_l:
+        engine_cc = int(round(float(m_l.group(1)) * 1000))
+    # age
+    year = v.get("year") or 0
+    from datetime import datetime as _dt
+    age = max(0, _dt.utcnow().year - year) if year else 5
+    defaults = suggest_defaults_for_listing(
+        listing_type=v.get("listing_type"),
+        damage_type=v.get("damage_type"),
+        condition=v.get("condition"),
+    )
+    return {
+        "vehicle_id": vehicle_id,
+        "fob_nzd": v.get("current_price_nzd") or v.get("buy_now_price_nzd"),
+        "age_years": age,
+        "engine_cc": engine_cc or 2000,
+        "engine_hp": 0,
+        "nz_branch": v.get("location") or "",
+        "listing_type": v.get("listing_type"),
+        **defaults,
+    }
+
+
+@router.get("/hot-daily")
+async def hot_daily(
+    limit: int = 8,
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Hot daily picks for Russian buyers.
+
+    Selection logic (auctions only — no fixed price):
+      - listing_type == "auction"
+      - status == "available"
+      - make in popular-for-Russia list
+      - year ≥ current_year − 8  (late-model)
+      - mileage_km ≤ 100,000  (low-km) when known
+      - sorted by (newest year DESC, lowest km ASC)
+    """
+    from datetime import datetime as _dt
+    POPULAR_MAKES = [
+        "toyota", "lexus", "honda", "mazda", "subaru", "nissan", "mitsubishi",
+        "bmw", "mercedes-benz", "mercedes", "volkswagen", "vw", "audi",
+        "hyundai", "kia", "infiniti", "porsche", "land rover",
+    ]
+    min_year = _dt.utcnow().year - 10
+    q = {
+        "listing_type": "auction",
+        "status": "available",
+        "year": {"$gte": min_year},
+        "$or": [
+            {"mileage_km": {"$lte": 150_000}},
+            {"mileage_km": None},
+        ],
+    }
+    # Match makes case-insensitively
+    q["make"] = {"$regex": "^(" + "|".join(POPULAR_MAKES) + ")$", "$options": "i"}
+    cursor = svc.db.auto_vehicles.find(q, {"_id": 0}).sort([
+        ("year", -1), ("mileage_km", 1)
+    ]).limit(max(1, min(limit, 24)))
+    items = [doc async for doc in cursor]
+    return {
+        "count": len(items),
+        "criteria": {
+            "popular_makes": POPULAR_MAKES,
+            "min_year": min_year,
+            "max_km": 100_000,
+        },
+        "items": items,
+    }
+
+
 @router.get("/auctions/calendar")
 async def auctions_calendar(
     city: Optional[str] = None,

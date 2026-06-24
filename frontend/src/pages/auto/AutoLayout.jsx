@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import QuickCategoryStrip from "../../components/auto/QuickCategoryStrip";
 import ChatWidget from "../../components/auto/ChatWidget";
 import ContactsBar from "../../components/auto/ContactsBar";
+import AutoFooter from "../../components/auto/AutoFooter";
 import "./auto.css";
 
 const NAV = [
@@ -15,6 +16,7 @@ const NAV = [
   { to: "/auto/end-of-life",                label: "Списанные авто" },
   { to: "/auto/buynow",                     label: "Купить сейчас" },
   { to: "/auto/fees",                       label: "Услуги" },
+  { to: "/auto/terms",                      label: "О компании" },
 ];
 
 export default function AutoLayout() {
@@ -102,17 +104,7 @@ export default function AutoLayout() {
         <Outlet />
       </main>
 
-      <footer className="mt-12 border-t border-white/10 bg-[#05070B] py-8">
-        <div className="mx-auto max-w-7xl px-6 text-sm text-gray-400">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="text-white font-bold">АвтоРесурс · BuyAnywhere</div>
-              <div className="mt-1">© {new Date().getFullYear()} · Покупка авто из НЗ и Австралии под заказ</div>
-            </div>
-            <ContactsBar variant="footer" />
-          </div>
-        </div>
-      </footer>
+      <AutoFooter />
 
       {/* Floating AI chat */}
       <ChatWidget />

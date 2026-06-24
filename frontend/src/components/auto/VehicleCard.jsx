@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { Calculator } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
+import LandedPriceModal from "./LandedPriceModal";
 
 const STATUS_BADGE = {
   available: { cls: "auto-badge-success", text: "Доступен" },
@@ -37,8 +39,8 @@ function fmtDate(v) {
 }
 
 export default function VehicleCard({ vehicle }) {
+  const [landedOpen, setLandedOpen] = useState(false);
   const status = STATUS_BADGE[vehicle.status] || { cls: "", text: vehicle.status };
-  // Prefer local (АвтоРесурс-branded) images over source previews
   const localImages = vehicle.local_images || [];
   const sourceImages = vehicle.images || vehicle.source_images || [];
   const cover = (localImages[0] || sourceImages[0]) || null;
@@ -72,7 +74,7 @@ export default function VehicleCard({ vehicle }) {
 
         <div className="vehicle-card__price-row">
           <div>
-            <div className="auto-muted vehicle-card__price-label">Текущая цена</div>
+            <div className="auto-muted vehicle-card__price-label">Цена в НЗ · FOB</div>
             <div className="vehicle-card__price">{fmtPrice(vehicle.current_price_nzd)}</div>
           </div>
           {vehicle.auction_end_time ? (
@@ -89,14 +91,35 @@ export default function VehicleCard({ vehicle }) {
           )}
         </div>
 
-        <Link
-          to={`/auto/vehicle/${vehicle.id}`}
-          className="auto-btn vehicle-card__cta"
-          data-testid={`vehicle-detail-link-${vehicle.id}`}
-        >
-          Подробнее
-        </Link>
+        <div className="vehicle-card__actions">
+          <Link
+            to={`/auto/vehicle/${vehicle.id}`}
+            className="auto-btn vehicle-card__cta"
+            data-testid={`vehicle-detail-link-${vehicle.id}`}
+          >
+            Подробнее
+          </Link>
+          {vehicle.current_price_nzd > 0 && (
+            <button
+              type="button"
+              className="auto-btn auto-btn--ghost vehicle-card__landed"
+              onClick={(e) => { e.preventDefault(); setLandedOpen(true); }}
+              data-testid={`vehicle-landed-btn-${vehicle.id}`}
+              title="Рассчитать ориентировочную цену под ключ во Владивостоке"
+            >
+              <Calculator size={14} style={{ marginRight: 6, verticalAlign: "text-bottom" }} />
+              Под ключ в РФ
+            </button>
+          )}
+        </div>
       </div>
+
+      <LandedPriceModal
+        open={landedOpen}
+        onClose={() => setLandedOpen(false)}
+        vehicleId={vehicle.id}
+        fallbackFobNzd={vehicle.current_price_nzd || vehicle.buy_now_price_nzd}
+      />
     </article>
   );
 }
