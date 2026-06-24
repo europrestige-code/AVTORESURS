@@ -382,6 +382,58 @@ async def admin_scheduler_status(_: Dict[str, Any] = Depends(require_admin)):
     return auto_scheduler.status()
 
 
+# ----- Public contacts -----
+
+@router.get("/contacts")
+async def contacts():
+    """Public contact details for the floating contact bar and chat widget."""
+    return {
+        "whatsapp": "+64 21 425 233",
+        "whatsapp_raw": "+6421425233",
+        "phone_nz": "+64 21 080 94550",
+        "phone_nz_raw": "+642108094550",
+        "phone_ru": "+7 913 512 1934",
+        "phone_ru_raw": "+79135121934",
+        "email": "auto@buyanywhere.ru",
+        "telegram": "@avtoresurs",
+    }
+
+
+# ----- AI chat (Тина) -----
+
+@router.post("/chat")
+async def chat(
+    payload: Dict[str, Any] = Body(...),
+    user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+    db=Depends(get_db),
+):
+    """Russian AI assistant trained on the АвтоРесурс business model.
+
+    Body: {message: str, history?: [{role,content}], session_id?: str}.
+    Anonymous use is allowed; logged-in users have their conversation
+    history persisted to auto_chat_messages for follow-up by support.
+    """
+    from services.auto_chat_service import get_chat_service
+    msg = (payload.get("message") or "").strip()
+    if not msg:
+        raise HTTPException(400, "Пустое сообщение.")
+    history = payload.get("history") or []
+    session_id = payload.get("session_id")
+    svc = get_chat_service()
+    result = await svc.reply(history, msg, session_id=session_id)
+    # Persist for logged-in users
+    if user:
+        from datetime import datetime as _dt
+        sid = result.get("session_id") or session_id
+        await db.auto_chat_messages.insert_many([
+            {"session_id": sid, "user_id": user["id"], "role": "user",
+             "content": msg, "created_at": _dt.utcnow()},
+            {"session_id": sid, "user_id": user["id"], "role": "assistant",
+             "content": result.get("content", ""), "created_at": _dt.utcnow()},
+        ])
+    return result
+
+
 # ----- Image branding backfill -----
 
 @router.post("/admin/images/backfill-branding")

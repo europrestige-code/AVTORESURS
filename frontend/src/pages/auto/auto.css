@@ -553,3 +553,118 @@
   .auto-root .category-hero__count { text-align: center; }
   .auto-root .category-grid { grid-template-columns: 1fr; }
 }
+
+/* --- Contacts bar --- */
+.auto-root .contacts-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.auto-root .contacts-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--auto-muted);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 150ms ease;
+}
+.auto-root .contacts-link:hover { color: var(--auto-text); }
+.auto-root .contacts-link--wa svg { color: #25D366; }
+.auto-root .contacts-link--ru svg { color: #ff9800; }
+
+/* --- Chat widget --- */
+.auto-root .chat-fab {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: var(--auto-primary);
+  color: #ffffff;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 18px 32px rgba(0, 102, 255, 0.35);
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease;
+}
+.auto-root .chat-fab:hover { background: var(--auto-primary-hover); transform: translateY(-1px); }
+.auto-root .chat-fab__label { font-size: 14px; }
+.auto-root .chat-panel {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  z-index: 60;
+  width: min(380px, calc(100vw - 32px));
+  height: 540px;
+  background: #0d0d0d;
+  border: 1px solid var(--auto-border);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 28px 50px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.auto-root .chat-panel__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--auto-border);
+  background: linear-gradient(180deg, #131313 0%, #0d0d0d 100%);
+}
+.auto-root .chat-panel__title { display: flex; align-items: center; gap: 10px; }
+.auto-root .chat-panel__avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--auto-primary); color: #fff;
+}
+.auto-root .chat-panel__close {
+  background: transparent; border: none; color: var(--auto-muted); cursor: pointer;
+  padding: 6px; border-radius: 8px;
+}
+.auto-root .chat-panel__close:hover { background: #1a1a1a; color: #fff; }
+.auto-root .chat-panel__body {
+  flex: 1; overflow-y: auto; padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.auto-root .chat-msg {
+  max-width: 85%;
+  padding: 10px 13px; border-radius: 14px;
+  font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word;
+}
+.auto-root .chat-msg--assistant { background: #1a1a1a; color: var(--auto-text); align-self: flex-start; border-bottom-left-radius: 4px; }
+.auto-root .chat-msg--user { background: var(--auto-primary); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+.auto-root .chat-msg--typing { display: inline-flex; align-items: center; gap: 4px; }
+.auto-root .chat-dots { display: inline-flex; gap: 3px; margin-left: 4px; }
+.auto-root .chat-dots span {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--auto-muted);
+  animation: chat-dot 1.2s infinite ease-in-out;
+}
+.auto-root .chat-dots span:nth-child(2) { animation-delay: 0.18s; }
+.auto-root .chat-dots span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes chat-dot { 0%, 70%, 100% { opacity: 0.3; } 35% { opacity: 1; } }
+.auto-root .chat-panel__quick {
+  padding: 8px 14px; display: flex; flex-wrap: wrap; gap: 6px;
+  border-top: 1px solid var(--auto-border);
+}
+.auto-root .chat-quick { cursor: pointer; font-size: 12px; }
+.auto-root .chat-panel__input {
+  display: flex; gap: 6px; padding: 12px 12px;
+  border-top: 1px solid var(--auto-border);
+}
+.auto-root .chat-panel__input .auto-btn { padding: 10px 14px; }
+.auto-root .chat-panel__clear {
+  background: transparent; border: none; color: var(--auto-muted);
+  font-size: 11px; padding: 6px 0 10px; cursor: pointer;
+}
+.auto-root .chat-panel__clear:hover { color: #fff; }
+
+@media (max-width: 540px) {
+  .auto-root .chat-fab__label { display: none; }
+  .auto-root .chat-fab { padding: 14px; }
+  .auto-root .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 12px; height: 70vh; }
+}
