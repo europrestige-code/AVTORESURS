@@ -29,6 +29,9 @@ import AutoAdmin from "./pages/auto/AutoAdmin";
 import AutoHowItWorks from "./pages/auto/AutoHowItWorks";
 import AutoFees from "./pages/auto/AutoFees";
 import AutoAustralia from "./pages/auto/AutoAustralia";
+import AutoAuctionsCalendar from "./pages/auto/AutoAuctionsCalendar";
+import AutoTerms from "./pages/auto/AutoTerms";
+import CategoryPage, { CATEGORY_DEFS } from "./pages/auto/CategoryPage";
 
 const Home = () => {
   return (
@@ -151,6 +154,13 @@ function App() {
                 <Route path="how-it-works" element={<AutoHowItWorks />} />
                 <Route path="fees" element={<AutoFees />} />
                 <Route path="australia" element={<AutoAustralia />} />
+                <Route path="auctions" element={<AutoAuctionsCalendar />} />
+                <Route path="terms" element={<AutoTerms />} />
+                <Route path="auctions-list" element={<CategoryPage category={CATEGORY_DEFS.auctions} />} />
+                <Route path="buynow" element={<CategoryPage category={CATEGORY_DEFS.buynow} />} />
+                <Route path="damaged" element={<CategoryPage category={CATEGORY_DEFS.damaged} />} />
+                <Route path="end-of-life" element={<CategoryPage category={CATEGORY_DEFS.eol} />} />
+                <Route path="parts" element={<CategoryPage category={CATEGORY_DEFS.parts} />} />
               </Route>
 
               {/* Regular app routes */}

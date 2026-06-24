@@ -190,11 +190,55 @@ async def price_breakdown(payload: Dict[str, Any] = Body(...)):
         vehicle_price_nzd=float(payload.get("vehicle_price_nzd", 0)),
         storage_days=int(payload.get("storage_days", 0)),
         forklift_nzd=float(payload.get("forklift_nzd", 0)),
-        local_transport_nzd=float(payload.get("local_transport_nzd", 500)),
+        local_transport_nzd=(float(payload["local_transport_nzd"])
+                              if payload.get("local_transport_nzd") not in (None, "") else None),
         documentation_nzd=float(payload.get("documentation_nzd", 250)),
         container_share_nzd=float(payload.get("container_share_nzd", 3333)),
         fx_rate_rub_nzd=payload.get("fx_rate_rub_nzd"),
+        branch_or_city=payload.get("branch_or_city") or payload.get("location"),
+        is_non_runner=bool(payload.get("is_non_runner", False)),
     )
+
+
+@router.get("/transport/cost")
+async def transport_cost_endpoint(
+    branch: Optional[str] = None,
+    non_runner: bool = False,
+):
+    from services.auto_transport_service import transport_cost
+    return transport_cost(branch, is_non_runner=non_runner)
+
+
+@router.get("/transport/pricing")
+async def transport_pricing_endpoint():
+    from services.auto_transport_service import list_branches
+    return {"runner_nzd_by_branch": list_branches()}
+
+
+@router.get("/auctions/calendar")
+async def auctions_calendar(
+    city: Optional[str] = None,
+    category: Optional[str] = None,
+    days_ahead: int = 21,
+    db=Depends(get_db),
+):
+    from services.auto_auctions_service import AuctionCalendarService
+    svc = AuctionCalendarService(db)
+    events = await svc.list_events(city=city, category=category, days_ahead=days_ahead)
+    days = await svc.summary_by_day(days_ahead=days_ahead)
+    return {"events": events, "by_day": days, "count": len(events)}
+
+
+@router.post("/admin/auctions/refresh")
+async def admin_refresh_auctions(
+    payload: Optional[Dict[str, Any]] = Body(None),
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    from services.auto_auctions_service import AuctionCalendarService
+    svc = AuctionCalendarService(db)
+    cats = (payload or {}).get("categories") or ["cars", "damaged", "trucks"]
+    return await svc.refresh(categories=cats)
 
 
 @router.get("/catalog-summary")

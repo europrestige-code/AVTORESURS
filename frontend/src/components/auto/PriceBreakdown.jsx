@@ -13,6 +13,7 @@ const LINES = [
 
 export default function PriceBreakdown({ breakdown, label = "Расчёт стоимости" }) {
   if (!breakdown) return null;
+  const td = breakdown.transport_detail;
   return (
     <div className="auto-card" data-testid="price-breakdown">
       <div style={{ fontWeight: 600, marginBottom: 10 }}>{label}</div>
@@ -20,7 +21,17 @@ export default function PriceBreakdown({ breakdown, label = "Расчёт сто
         <tbody>
           {LINES.map(([k, l]) => (
             <tr key={k}>
-              <td className="auto-muted">{l}</td>
+              <td className="auto-muted">
+                {l}
+                {k === "local_transport_nzd" && td && (
+                  <div className="auto-muted" style={{ fontSize: 11, marginTop: 2 }} data-testid="transport-detail">
+                    {td.matched ? td.branch : "стандартный тариф"}
+                    {td.is_non_runner && (
+                      <span className="auto-badge auto-badge-warning" style={{ marginLeft: 6 }}>×2 не на ходу</span>
+                    )}
+                  </div>
+                )}
+              </td>
               <td style={{ textAlign: "right" }}>{fmtPrice(breakdown[k])}</td>
             </tr>
           ))}

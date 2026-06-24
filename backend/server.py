@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -375,6 +376,14 @@ app.include_router(crm_bulk_router)
 # Include BuyAnywhere Auto routes (mounted at /api/auto)
 app.include_router(auto_router)
 
+# Serve АвтоРесурс branded images. The branding service writes to
+# backend/uploads/branded/, and the catalogue can reference these via /uploads/...
+_uploads_dir = ROOT_DIR / "uploads"
+_uploads_dir.mkdir(parents=True, exist_ok=True)
+(_uploads_dir / "branded").mkdir(parents=True, exist_ok=True)
+(_uploads_dir / "deposits").mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
+
 # Include admin CRM routes
 @api_router.get("/admin/dashboard")
 async def get_admin_dashboard():
@@ -516,6 +525,8 @@ async def startup_services():
         try:
             auto_svc = AutoService(db)
             await auto_svc.ensure_indexes()
+            from services.auto_auctions_service import AuctionCalendarService
+            await AuctionCalendarService(db).ensure_indexes()
         except Exception as ie:
             logger.warning(f"Auto module index init failed: {ie}")
         

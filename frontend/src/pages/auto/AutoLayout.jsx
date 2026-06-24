@@ -6,9 +6,13 @@ import "./auto.css";
 const NAV = [
   { to: "/auto", label: "Главная", end: true },
   { to: "/auto/catalog", label: "Каталог" },
-  { to: "/auto/how-it-works", label: "Как это работает" },
+  { to: "/auto/auctions", label: "Календарь аукционов" },
+  { to: "/auto/damaged", label: "Повреждённые" },
+  { to: "/auto/end-of-life", label: "End of Life" },
+  { to: "/auto/buynow", label: "Купить сейчас" },
   { to: "/auto/fees", label: "Стоимость" },
-  { to: "/auto/australia", label: "Австралия" },
+  { to: "/auto/how-it-works", label: "Как это работает" },
+  { to: "/auto/terms", label: "Условия" },
 ];
 
 export default function AutoLayout() {

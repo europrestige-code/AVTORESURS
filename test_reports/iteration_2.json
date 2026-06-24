@@ -1,0 +1,52 @@
+{
+  "summary": "Iteration 2 — focused testing of new endpoints (transport cost, auctions calendar, price-breakdown with branch+non-runner) and new UI pages (/auto/auctions, /auto/damaged, /auto/end-of-life, /auto/buynow, /auto/terms, /auto/fees with city dropdown). All 11 backend tests pass; all targeted frontend flows verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auto_iteration2.py",
+    "/app/test_reports/pytest/iter2_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "auto_auctions_service.summary_by_day() emits buckets keyed 'events'/'lots' (not 'count'). Documented but worth aligning naming with /api/auto/auctions/calendar top-level 'count' to reduce confusion.",
+    "Transport fallback to legacy NZ$500 happens silently when branch_or_city is provided but unmatched — UI shows 'matched=false' but consider surfacing a 'fallback default' note in PriceBreakdown.",
+    "/api/auto/auctions/calendar performs an in-process scrape on cold cache — first call from a fresh DB may take 10–20s. Consider warming during seed_auto.py."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auto_iteration2.py (created)"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (all targeted flows)"},
+  "test_credentials": "admin@buyanywhere.com / admin12345 ; client@buyanywhere.com / client12345 (verified) ; client2@buyanywhere.com / client12345",
+  "seed_data_creation": "Tests create one ephemeral NZ vehicle with location='Веллингтон' and hard-delete it at end. Admin refresh of Turners calendar performed (live network access available; 47 events for Turners across 21 days at test time).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All new endpoints + UI verified PASS. Backend pytest file at /app/backend/tests/test_auto_iteration2.py. Note: by_day buckets use key 'events' (not 'count'); the test handles both. The Turners scraper works against the live site at test time and returns 47 events / 1255+ lots. /auto/fees Christchurch + non-runner shows NZ$2,500 transport, NZ$15,683 total — matches the price-breakdown API exactly. Vehicle card alignment verified: cta_tops are equal within each row (947.30 / 1380.28).",
+  "verified_features": [
+    "GET /api/auto/auctions/calendar?days_ahead=21 returns {count:47, events:[...], by_day:[...]} with bucket sum == count, source='turners', valid ISO starts_at, lots:int, auction_url contains turners.co.nz",
+    "GET /api/auto/auctions/calendar?city=Christchurch returns only Christchurch events",
+    "POST /api/auto/admin/auctions/refresh without token => 401 (HTTPBearer); with admin token => 200 with {fetched:int, by_category:{cars:int>=0}, at:iso}",
+    "GET /api/auto/transport/cost?branch=Wellington&non_runner=true => runner_nzd=680, multiplier=2.0, transport_nzd=1360, matched=true",
+    "GET /api/auto/transport/cost?branch=Auckland&non_runner=false => 0/1.0/0/matched=true",
+    "GET /api/auto/transport/pricing => runner_nzd_by_branch dict with 30+ cities",
+    "POST /api/auto/price-breakdown {vehicle_price_nzd:8000, branch_or_city:'Christchurch', is_non_runner:true} => local_transport_nzd:2500, transport_detail.runner_nzd:1250, multiplier:2.0, total_nzd:15683",
+    "POST /api/auto/price-breakdown without branch_or_city => legacy NZ$500 (back-compat)",
+    "GET /api/auto/vehicles/{id} with Russian location 'Веллингтон' returns 200 with price_breakdown.transport_detail populated (transport_nzd non-null, matched may be false — graceful)",
+    "Frontend /auto/auctions: auctions-calendar-grid (21-day strip), auctions-summary '47 аукционов · 1 256 лотов', auctions-table list — all render",
+    "Frontend admin login → /auto/auctions shows auctions-refresh-btn; click triggers refresh, summary re-renders",
+    "Frontend /auto/damaged: category-hero-damaged with title 'Повреждённые', source badges, count, filters sidebar — render",
+    "Frontend /auto/end-of-life: category-hero-eol renders (grid populated, no empty state since donors exist)",
+    "Frontend /auto/buynow: category-hero-buynow renders",
+    "Frontend /auto/terms: all 8 sections terms-section-1..8 and terms-acceptance render",
+    "Frontend search hero tiles: search-cat-calendar, search-cat-damaged, search-cat-eol, search-cat-buynow, search-cat-auctions all present (1 each)",
+    "Frontend /auto/catalog vehicle cards: 12 cards × 12 ctas; cta_tops align horizontally per row (947.30 row1, 1380.28 row2)",
+    "Frontend /auto/fees: fees-city dropdown + fees-non-runner checkbox; selecting Christchurch + checking non-runner updates breakdown to NZ$2,500 transport / NZ$15,683 total with '×2 не на ходу' badge"
+  ],
+  "rca of the issue": "n/a — all features verified PASS"
+}

@@ -8,11 +8,12 @@ const STATUS_BADGE = {
   expired: { cls: "auto-badge-warning", text: "Истёк" },
   won: { cls: "auto-badge-primary", text: "Куплен" },
   hidden: { cls: "", text: "Скрыт" },
+  import_error: { cls: "auto-badge-warning", text: "Импорт" },
 };
 
 const LISTING_LABEL = {
   auction: "Аукцион",
-  fixed_price: "Фикс. цена",
+  fixed_price: "Купить сейчас",
   inquiry_only: "По запросу",
 };
 
@@ -37,54 +38,66 @@ function fmtDate(v) {
 
 export default function VehicleCard({ vehicle }) {
   const status = STATUS_BADGE[vehicle.status] || { cls: "", text: vehicle.status };
-  const cover = (vehicle.images && vehicle.images[0]) || null;
+  // Prefer local (АвтоРесурс-branded) images over source previews
+  const localImages = vehicle.local_images || [];
+  const sourceImages = vehicle.images || vehicle.source_images || [];
+  const cover = (localImages[0] || sourceImages[0]) || null;
+  const isBranded = !!localImages[0];
+
   return (
-    <div className="auto-card" data-testid={`vehicle-card-${vehicle.id}`}>
-      <div style={{ position: "relative" }}>
+    <article className="auto-card vehicle-card" data-testid={`vehicle-card-${vehicle.id}`}>
+      <div className="vehicle-card__media">
         {cover ? (
-          <img src={cover} alt={vehicle.title_ru} className="auto-image" />
+          <img src={cover} alt={vehicle.title_ru} className="vehicle-card__img" loading="lazy" />
         ) : (
-          <div className="auto-placeholder">Нет изображения</div>
+          <div className="vehicle-card__placeholder">Нет изображения</div>
         )}
-        <div style={{ position: "absolute", top: 10, left: 10, display: "flex", gap: 6 }}>
+        <div className="vehicle-card__badges">
           <span className={`auto-badge ${status.cls}`}>{status.text}</span>
           <span className="auto-badge">{vehicle.country}</span>
           <span className="auto-badge">{LISTING_LABEL[vehicle.listing_type] || vehicle.listing_type}</span>
+          {!isBranded && sourceImages[0] && (
+            <span className="auto-badge" title="Превью из источника">Источник</span>
+          )}
         </div>
       </div>
-      <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{vehicle.title_ru}</div>
-        <div className="auto-muted" style={{ fontSize: 13, marginTop: 4 }}>
+
+      <div className="vehicle-card__body">
+        <h3 className="vehicle-card__title">{vehicle.title_ru}</h3>
+        <div className="vehicle-card__meta auto-muted">
           {vehicle.year ? `${vehicle.year} · ` : ""}
           {fmtKm(vehicle.mileage_km)}
           {vehicle.location ? ` · ${vehicle.location}` : ""}
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", marginTop: 12 }}>
+
+        <div className="vehicle-card__price-row">
           <div>
-            <div className="auto-muted" style={{ fontSize: 12 }}>Текущая цена</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtPrice(vehicle.current_price_nzd)}</div>
+            <div className="auto-muted vehicle-card__price-label">Текущая цена</div>
+            <div className="vehicle-card__price">{fmtPrice(vehicle.current_price_nzd)}</div>
           </div>
-          {vehicle.auction_end_time && (
-            <div style={{ textAlign: "right" }}>
-              <div className="auto-muted" style={{ fontSize: 12 }}>До окончания</div>
+          {vehicle.auction_end_time ? (
+            <div className="vehicle-card__countdown">
+              <div className="auto-muted vehicle-card__price-label">До окончания</div>
               <CountdownTimer
                 target={vehicle.auction_end_time}
                 compact
                 testid={`vehicle-countdown-${vehicle.id}`}
               />
             </div>
+          ) : (
+            <div className="vehicle-card__countdown vehicle-card__countdown--empty" aria-hidden />
           )}
         </div>
+
         <Link
           to={`/auto/vehicle/${vehicle.id}`}
-          className="auto-btn"
-          style={{ width: "100%", marginTop: 14 }}
+          className="auto-btn vehicle-card__cta"
           data-testid={`vehicle-detail-link-${vehicle.id}`}
         >
           Подробнее
         </Link>
       </div>
-    </div>
+    </article>
   );
 }
 

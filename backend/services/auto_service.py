@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+
 from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -49,28 +50,89 @@ def _strip_id(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return doc
 
 
+# Heuristic: detect a vehicle that won't drive (and therefore needs to be
+# towed → 2× transport per spec).
+_NON_RUNNER_KEYWORDS = (
+    "не заводится", "не запускается", "non-runner", "non runner",
+    "non_runner", "won't start", "wont start", "не на ходу", "не на ход",
+    "донор", "на запчасти", "parts only", "разбор", "engine damage",
+    "engine seized", "no start", "for parts", "wreck", "wrecked", "salvage",
+)
+
+
+def _is_non_runner(vehicle: Dict[str, Any]) -> bool:
+    if vehicle.get("is_non_runner") is True:
+        return True
+    haystack = " ".join(str(vehicle.get(k) or "") for k in (
+        "condition", "damage_type", "description_ru", "description_original",
+        "title_ru", "title_original",
+    )).lower()
+    return any(k in haystack for k in _NON_RUNNER_KEYWORDS)
+
+
 def calculate_price_breakdown(
     vehicle_price_nzd: float,
     storage_days: int = 0,
     forklift_nzd: float = 0.0,
-    local_transport_nzd: float = LOCAL_TRANSPORT_DEFAULT,
+    local_transport_nzd: Optional[float] = None,
     documentation_nzd: float = DOCUMENTATION_FEE,
     container_share_nzd: float = CONTAINER_SHARE,
     fx_rate_rub_nzd: Optional[float] = None,
-) -> Dict[str, float]:
+    branch_or_city: Optional[str] = None,
+    is_non_runner: bool = False,
+) -> Dict[str, Any]:
     """Return pricing breakdown for a vehicle.
 
     estimated_total_nzd = price + commission + transport + forklift + storage
                        + documentation + container share
+
+    Transport rules (per spec):
+      • Auckland-area branches → $0 extra (default base $0).
+      • Other NZ branches → city-specific surcharge from auto_transport_service.
+      • Non-runners → 2 × transport.
+      • If neither branch nor explicit override is provided, fall back to
+        the legacy NZ$500 default so back-compat is preserved.
     """
     if vehicle_price_nzd is None or vehicle_price_nzd < 0:
         raise HTTPException(400, "Цена автомобиля должна быть неотрицательной.")
     commission = round(vehicle_price_nzd * COMMISSION_RATE, 2)
     storage = round(max(storage_days, 0) * STORAGE_RATE_PER_DAY, 2)
+
+    transport_detail: Dict[str, Any]
+    if local_transport_nzd is not None:
+        # Caller forced a value; still apply the non-runner doubling rule.
+        runner = float(local_transport_nzd)
+        multiplier = 2.0 if is_non_runner else 1.0
+        transport_amount = round(runner * multiplier, 2)
+        transport_detail = {
+            "branch": branch_or_city,
+            "matched": False,
+            "runner_nzd": runner,
+            "is_non_runner": is_non_runner,
+            "multiplier": multiplier,
+            "transport_nzd": transport_amount,
+        }
+    elif branch_or_city:
+        from services.auto_transport_service import transport_cost  # local to avoid cycle
+        transport_detail = transport_cost(branch_or_city, is_non_runner=is_non_runner)
+        transport_amount = float(transport_detail["transport_nzd"])
+    else:
+        runner = LOCAL_TRANSPORT_DEFAULT
+        multiplier = 2.0 if is_non_runner else 1.0
+        transport_amount = round(runner * multiplier, 2)
+        transport_detail = {
+            "branch": None,
+            "matched": False,
+            "runner_nzd": runner,
+            "is_non_runner": is_non_runner,
+            "multiplier": multiplier,
+            "transport_nzd": transport_amount,
+        }
+
     total_nzd = round(
         vehicle_price_nzd
         + commission
-        + local_transport_nzd
+        + transport_amount
         + forklift_nzd
         + storage
         + documentation_nzd
@@ -81,7 +143,8 @@ def calculate_price_breakdown(
     return {
         "vehicle_price_nzd": round(vehicle_price_nzd, 2),
         "commission_nzd": commission,
-        "local_transport_nzd": round(local_transport_nzd, 2),
+        "local_transport_nzd": transport_amount,
+        "transport_detail": transport_detail,
         "forklift_nzd": round(forklift_nzd, 2),
         "storage_days": storage_days,
         "storage_nzd": storage,
@@ -188,9 +251,16 @@ class AutoService:
         highest = await self.get_highest_bid(vehicle_id)
         doc["highest_bid_nzd"] = highest.highest_bid_nzd
         doc["bid_count"] = highest.bid_count
-        # Pricing breakdown preview if price known
+        # Pricing breakdown preview if price known. Auto-infer transport from
+        # `location` and detect non-runners by condition/damage.
         if doc.get("current_price_nzd"):
-            doc["price_breakdown"] = calculate_price_breakdown(doc["current_price_nzd"])
+            non_runner = _is_non_runner(doc)
+            doc["is_non_runner"] = non_runner
+            doc["price_breakdown"] = calculate_price_breakdown(
+                doc["current_price_nzd"],
+                branch_or_city=doc.get("location"),
+                is_non_runner=non_runner,
+            )
         return doc
 
     async def create_vehicle(self, vehicle: AutoVehicle) -> Dict[str, Any]:

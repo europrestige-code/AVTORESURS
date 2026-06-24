@@ -15,13 +15,13 @@ const BODY_TYPE_LABEL = {
 };
 
 const CATEGORIES = [
-  { key: "auction", label: "Аукционы", filter: { listing_type: "auction" }, icon: "🏁" },
-  { key: "trucks", label: "Грузовики и техника", filter: { body_type: "Грузовик" }, icon: "🚚", soon: true },
-  { key: "damaged", label: "Повреждённые / EOL", filter: { damage_type: "Затопление" }, icon: "🛠️" },
-  { key: "boats", label: "Лодки и катера", filter: { body_type: "Лодка" }, icon: "⛵", soon: true },
+  { key: "auctions", label: "Аукционы", route: "/auto/auctions-list", icon: "🏁" },
+  { key: "buynow", label: "Купить сейчас", route: "/auto/buynow", icon: "💳" },
+  { key: "damaged", label: "Повреждённые", route: "/auto/damaged", icon: "🛠️" },
+  { key: "eol", label: "End of Life", route: "/auto/end-of-life", icon: "♻️" },
+  { key: "calendar", label: "Календарь", route: "/auto/auctions", icon: "📅" },
+  { key: "parts", label: "Запчасти", route: "/auto/parts", icon: "🔧", soon: true },
   { key: "moto", label: "Мотоциклы", filter: { body_type: "Мотоцикл" }, icon: "🏍️", soon: true },
-  { key: "general", label: "Общая техника", filter: { body_type: "Общая" }, icon: "📦", soon: true },
-  { key: "vans", label: "Автобусы и автодома", filter: { body_type: "Фургон" }, icon: "🚐" },
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -139,7 +139,11 @@ export default function SearchHero({ variant = "home" }) {
           <button
             key={c.key}
             type="button"
-            onClick={() => !c.soon && goWith(c.filter)}
+            onClick={() => {
+              if (c.soon) return;
+              if (c.route) navigate(c.route);
+              else if (c.filter) goWith(c.filter);
+            }}
             className="auto-cat-tile"
             disabled={c.soon}
             data-testid={`search-cat-${c.key}`}
