@@ -6,6 +6,7 @@ import BidPanel from "../../components/auto/BidPanel";
 import PriceBreakdown from "../../components/auto/PriceBreakdown";
 import CountdownTimer from "../../components/auto/CountdownTimer";
 import { fmtPrice, fmtKm, fmtDate, LISTING_LABEL } from "../../components/auto/VehicleCard";
+import { getFxRate, formatRub } from "../../services/autoCurrency";
 
 export default function AutoVehicleDetail() {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export default function AutoVehicleDetail() {
   const [error, setError] = useState(null);
   const [activeImage, setActiveImage] = useState(0);
   const [depositVerified, setDepositVerified] = useState(false);
+  useEffect(() => { getFxRate(); }, []);
   const [inquiry, setInquiry] = useState({ message: "", phone: "", telegram: "" });
   const [inquiryStatus, setInquiryStatus] = useState(null);
   const [watching, setWatching] = useState(false);
@@ -167,15 +169,15 @@ export default function AutoVehicleDetail() {
 
         <div style={{ display: "grid", gap: 18, alignContent: "start" }}>
           <div className="auto-card">
-            <div className="auto-muted" style={{ fontSize: 12 }}>Текущая цена</div>
+            <div className="auto-muted" style={{ fontSize: 12 }}>Цена · с аукциона</div>
             <div style={{ fontSize: 28, fontWeight: 800 }} data-testid="vehicle-price">
-              {fmtPrice(vehicle.current_price_nzd)}
+              {formatRub(vehicle.current_price_nzd)}
             </div>
             {vehicle.buy_now_price_nzd && (
-              <div className="auto-muted" style={{ marginTop: 6 }}>Купить сразу: {fmtPrice(vehicle.buy_now_price_nzd)}</div>
+              <div className="auto-muted" style={{ marginTop: 6 }}>Купить сразу: {formatRub(vehicle.buy_now_price_nzd)}</div>
             )}
             <div className="auto-muted" style={{ fontSize: 13, marginTop: 6 }}>
-              Внутр. макс. ставка: <b style={{ color: "var(--auto-text)" }}>{fmtPrice(vehicle.highest_bid_nzd || 0)}</b>
+              Внутр. макс. ставка: <b style={{ color: "var(--auto-text)" }}>{formatRub(vehicle.highest_bid_nzd || 0)}</b>
               {" · "}ставок: {vehicle.bid_count || 0}
             </div>
             {vehicle.auction_end_time && (

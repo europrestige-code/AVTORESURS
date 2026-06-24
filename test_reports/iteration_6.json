@@ -1,0 +1,47 @@
+{
+  "summary": "Iter 6 — Verified RUB-only public pricing, /fx-rate, /hot-daily (max 2 with pick_label), /ru-customs/calc (with NZ extras + non-runner ×2), /chat in Russian. Backend pytest 5/6 PASS. Frontend: /auto homepage redesigned correctly — no NZ$ on customer surfaces, ₽ visible on search panel (₽ 0 / ₽ 6 000 000+), hot-daily section present with 1 card labelled 'Самый свежий' (only 1 because super_new and super_cheap resolved to same vehicle — backend dedupes correctly, acceptable per spec), 'Цена · с аукциона' label rendered, nav has 'Списанные авто' + 'О компании', AutoFooter with 3 cols + phones + social + legal, contacts bar with +64/+7 phones. /auto/damaged: 2 cards, NZ$ count = 0 on page, 'Под ключ в РФ' buttons present, LandedPriceModal opens, header 'Под ключ во Владивостоке (ориентир)' present, live recalc working (total 1 718 346 ₽ shown via data-testid='lm-total'), close button works. Sub-totals inside modal still use NZ$/USD for NZ-side and freight blocks — this is per-spec ('NZD/USD/RUB as appropriate'). HOWEVER iter5 bug PERSISTS: damaged vehicle still returns is_non_runner=False, inspection=False, forklift=False from /landed-defaults; modal opens with all toggles unchecked for damaged cars (test confirmed for vehicle 9fdae724…). Homepage hot-daily card still hides 'Под ключ в РФ' button because the selected vehicle (Mitsubishi Eclipse Cross 2022) has current_price_nzd null/0 — same buy_now-only guard issue flagged in iter5.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/auto/vehicles/{id}/landed-defaults",
+       "issue": "STILL BROKEN since iter5 — damaged vehicle 9a7174a2-9842-4129-b6e4-298ede2526b1 returns is_non_runner=False, inspection=False, forklift=False, scheme='whole'. suggest_defaults_for_listing() must dispatch on condition='Повреждённое'/'На запчасти' or non-empty damage_type, since all seed vehicles have listing_type='auction'.",
+       "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "VehicleCard", "issue": "Hides 'Под ключ в РФ' button when current_price_nzd is null/0; homepage hot-daily card and most catalog buy-now cards therefore lose the calculator CTA. Should also enable button when buy_now_price_nzd > 0.", "selector": "[data-testid^='vehicle-landed-btn-']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "LandedPriceModal preselect for DAMAGED listing",
+       "issue": "Modal opens with non-runner / inspection / forklift all UNCHECKED for vehicles with condition='Повреждённое' — downstream of backend defaults bug. Once backend fixed, frontend already reads the flags correctly (no FE change needed).",
+       "affected_selectors": ["lm-nonrunner", "lm-inspection", "lm-forklift", "lm-dismantling", "lm-scheme"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter6_rub_hot.py",
+    "/app/test_reports/pytest/iter6.xml"
+  ],
+  "action_items": [
+    "Fix services/auto_ru_customs_service.suggest_defaults_for_listing — dispatch primarily on condition / damage_type (NOT listing_type) so DAMAGED → non_runner+inspection+forklift True, END_OF_LIFE / condition='На запчасти' → scheme=parts + non_runner+forklift+dismantling True. Same bug as iter5.",
+    "Relax VehicleCard 'Под ключ в РФ' button guard: show button when (current_price_nzd > 0) OR (buy_now_price_nzd > 0), so hot-daily and buy-now cards keep the calculator CTA.",
+    "Optional: split /app/backend/routes/auto_routes.py (1300+ lines) into sub-routers (public/admin-vehicles/admin-sources/admin-stripe/chat) — same code-review item carried from iter3/4/5."
+  ],
+  "critical_code_review_comments": [
+    "Same iter5 dispatch bug still present in suggest_defaults_for_listing — has now persisted across two iterations; main agent must update the helper.",
+    "auto_routes.py file size still 1300+ lines (>700 guideline).",
+    "VehicleCard fmtPrice() exports an NZD formatter that is now dead code on the public site (kept only for admin pages); confirm and drop if unused.",
+    "LandedPriceModal NZ-side rows intentionally show NZ$/USD inside the modal — acceptable per spec, but worth a UX note that the headline RUB total is what customers see at the bottom."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter6_rub_hot.py (NEW)"
+  ],
+  "success_rate": {"backend": "83% (5/6 pytest pass — only landed-defaults damaged case fails)", "frontend": "90% — homepage, RUB display, hot-daily, modal flow, footer all green; preselect for DAMAGED still broken (downstream)"},
+  "test_credentials": "admin@buyanywhere.com / admin12345; client@buyanywhere.com / client12345",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The only critical regression is the same iter5 backend issue — GET /api/auto/vehicles/{id}/landed-defaults for damaged/end-of-life vehicles. To reproduce: `curl ${BASE}/api/auto/vehicles/9a7174a2-9842-4129-b6e4-298ede2526b1/landed-defaults` — should return is_non_runner=true, inspection=true, forklift=true; today returns all False. After fix, retest by opening /auto/damaged and clicking 'Под ключ в РФ' on first card — expect lm-nonrunner checkbox checked. Additionally consider widening the VehicleCard button guard to include buy_now_price_nzd. All other requirements (RUB-only public prices, FX endpoint with 3% markup, hot-daily max 2 with pick_label, nav items, AutoFooter, ContactsBar, chat in Russian) verified PASS.",
+  "rca of the issue": "services/auto_ru_customs_service.suggest_defaults_for_listing() still keys on listing_type which equals 'auction' for every seeded vehicle (including damaged + end-of-life). The function never reaches the DAMAGED / END_OF_LIFE branch because that branch likely keys on a non-existent listing_type value. Fix: branch on `condition in ('Повреждённое',)` OR non-empty `damage_type not in (None, '', 'Без повреждений')` → set is_non_runner=inspection=forklift=True; `condition == 'На запчасти'` OR `damage_type in ('Двигатель','Тотал')` → scheme='parts' + non_runner+forklift+dismantling=True."
+}

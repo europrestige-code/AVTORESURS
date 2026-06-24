@@ -16,6 +16,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import autoApi from "../../services/autoApi";
+import { getFxRate, formatRub } from "../../services/autoCurrency";
 
 /* ==========================================================================
  * Imagery — placeholder URLs; replace with API-driven photos once available.
@@ -131,6 +132,9 @@ export default function AutoHome() {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Warm up FX cache so all <formatRub> calls below render immediately
+  useEffect(() => { getFxRate(); }, []);
 
   // Pull live data
   useEffect(() => {
@@ -275,8 +279,8 @@ function SearchPanel({ total, onSubmit }) {
           <Select label="Модель"     value="Любая модель"   />
           <Select label="Год от"     value="2010"           />
           <Select label="Год до"     value="2024"           />
-          <Select label="Цена от"    value="NZ$ 0"          />
-          <Select label="Цена до"    value="NZ$ 100 000+"   />
+          <Select label="Цена от"    value="₽ 0"            />
+          <Select label="Цена до"    value="₽ 6 000 000+"   />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -536,14 +540,11 @@ function HotDaily() {
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-300">
-            <span>🔥</span> ГОРЯЧИЕ ПРЕДЛОЖЕНИЯ ДНЯ
+            <span>🔥</span> Хиты дня
           </div>
           <h2 className="mt-2 text-2xl font-bold lg:text-3xl">
-            Топ для России — свежий год, малый пробег
+            Лучший выбор сегодня
           </h2>
-          <p className="mt-1 text-sm text-gray-400">
-            Только с аукционов · популярные модели · отбирается ежедневно
-          </p>
         </div>
         <Link
           to="/auto/catalog"
@@ -555,13 +556,13 @@ function HotDaily() {
       </div>
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="h-72 animate-pulse rounded-2xl border border-white/10 bg-[#0D111A]" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={`grid gap-4 ${items.length === 1 ? "sm:grid-cols-1 sm:max-w-2xl" : "sm:grid-cols-2"}`}>
           {items.map((v) => (
             <HotCard key={v.id} v={v} />
           ))}
@@ -596,7 +597,7 @@ function HotCard({ v }) {
           </div>
         )}
         <span className="absolute left-3 top-3 inline-block rounded-md bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-amber-950">
-          🔥 ХИТ
+          🔥 {v.pick_label || "ХИТ"}
         </span>
         {v.country && (
           <span className="absolute right-3 top-3 inline-block rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
@@ -614,9 +615,9 @@ function HotCard({ v }) {
         </div>
         <div className="mt-3 flex items-end justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">Цена · FOB</div>
+            <div className="text-[10px] uppercase tracking-wider text-gray-500">Цена · с аукциона</div>
             <div className="font-mono text-base font-bold text-white">
-              {v.current_price_nzd ? `NZ$${Number(v.current_price_nzd).toLocaleString("en-NZ")}` : "—"}
+              {v.current_price_nzd ? formatRub(v.current_price_nzd) : <span className="text-gray-400">По запросу</span>}
             </div>
           </div>
           <span className="text-xs font-semibold text-blue-400 transition group-hover:text-blue-300">

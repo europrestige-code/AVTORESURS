@@ -318,18 +318,17 @@ async def vehicle_landed_defaults(
 
 @router.get("/hot-daily")
 async def hot_daily(
-    limit: int = 8,
     svc: AutoService = Depends(get_auto_service),
 ):
-    """Hot daily picks for Russian buyers.
+    """Daily handpicks for Russian buyers — MAX 2 items.
 
-    Selection logic (auctions only — no fixed price):
-      - listing_type == "auction"
-      - status == "available"
-      - make in popular-for-Russia list
-      - year ≥ current_year − 8  (late-model)
-      - mileage_km ≤ 100,000  (low-km) when known
-      - sorted by (newest year DESC, lowest km ASC)
+    One «super new» (newest year) + one «super cheap» (lowest current price).
+    Both must be:
+      - listing_type = "auction"   (no fixed-price)
+      - status = "available"
+      - make ∈ popular-for-RU list (Toyota/Lexus/Honda/Mazda/Subaru/Nissan/…)
+      - year ≥ current_year − 5   (under-5-years-old)
+      - mileage ≤ 150 000 km (or unknown)
     """
     from datetime import datetime as _dt
     POPULAR_MAKES = [
@@ -337,31 +336,56 @@ async def hot_daily(
         "bmw", "mercedes-benz", "mercedes", "volkswagen", "vw", "audi",
         "hyundai", "kia", "infiniti", "porsche", "land rover",
     ]
-    min_year = _dt.utcnow().year - 10
-    q = {
+    min_year = _dt.utcnow().year - 5
+    makes_re = "(" + "|".join(POPULAR_MAKES) + ")"
+    base_q = {
         "listing_type": "auction",
         "status": "available",
         "year": {"$gte": min_year},
+        # Match popular makes either in the `make` column OR the parsed title.
         "$or": [
-            {"mileage_km": {"$lte": 150_000}},
-            {"mileage_km": None},
+            {"make":     {"$regex": makes_re, "$options": "i"}},
+            {"title_ru": {"$regex": makes_re, "$options": "i"}},
         ],
     }
-    # Match makes case-insensitively
-    q["make"] = {"$regex": "^(" + "|".join(POPULAR_MAKES) + ")$", "$options": "i"}
-    cursor = svc.db.auto_vehicles.find(q, {"_id": 0}).sort([
-        ("year", -1), ("mileage_km", 1)
-    ]).limit(max(1, min(limit, 24)))
-    items = [doc async for doc in cursor]
+    # Super new: newest year, lowest km
+    super_new = await svc.db.auto_vehicles.find_one(
+        base_q, {"_id": 0}, sort=[("year", -1), ("mileage_km", 1)]
+    )
+    # Super cheap: lowest current OR buy-now price (must be >0)
+    cheap_q = dict(base_q)
+    cheap_q["$and"] = [{
+        "$or": [
+            {"current_price_nzd": {"$gt": 0}},
+            {"buy_now_price_nzd": {"$gt": 0}},
+        ],
+    }]
+    super_cheap = await svc.db.auto_vehicles.find_one(
+        cheap_q, {"_id": 0}, sort=[("current_price_nzd", 1)]
+    )
+    items = []
+    if super_new:
+        super_new["pick_label"] = "Самый свежий"
+        items.append(super_new)
+    if super_cheap and (not super_new or super_cheap.get("id") != super_new.get("id")):
+        super_cheap["pick_label"] = "Самый выгодный"
+        items.append(super_cheap)
     return {
         "count": len(items),
         "criteria": {
             "popular_makes": POPULAR_MAKES,
             "min_year": min_year,
-            "max_km": 100_000,
+            "max_km": 150_000,
         },
         "items": items,
     }
+
+
+@router.get("/fx-rate")
+async def fx_rate(force_refresh: bool = False):
+    """Live NZD → RUB rate (Google/open.er-api spot) + 3% convenience markup."""
+    from services.auto_fx_service import get_fx_rate
+    return await get_fx_rate(force_refresh=force_refresh)
 
 
 @router.get("/auctions/calendar")

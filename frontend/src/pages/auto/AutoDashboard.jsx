@@ -4,7 +4,7 @@ import autoApi from "../../services/autoApi";
 import { useAuth } from "../../contexts/AuthContext";
 import DepositStatus from "../../components/auto/DepositStatus";
 import LogisticsTimeline, { LOGISTICS_LABELS } from "../../components/auto/LogisticsTimeline";
-import { fmtPrice } from "../../components/auto/VehicleCard";
+import { getFxRate, formatRub } from "../../services/autoCurrency";
 
 const BID_STATUS = {
   active: { cls: "auto-badge-success", text: "Лидируете" },
@@ -32,6 +32,7 @@ export default function AutoDashboard() {
 
   useEffect(() => {
     load();
+    getFxRate();
   }, [load]);
 
   // Poll Stripe status when returning from checkout
@@ -105,7 +106,7 @@ export default function AutoDashboard() {
                         </Link>
                       ) : b.vehicle_id}
                     </td>
-                    <td>{fmtPrice(b.max_bid_nzd)}</td>
+                    <td>{formatRub(b.max_bid_nzd)}</td>
                     <td><span className={`auto-badge ${s.cls}`}>{s.text}</span></td>
                     <td>{new Date(b.created_at).toLocaleString("ru-RU")}</td>
                   </tr>
@@ -123,7 +124,7 @@ export default function AutoDashboard() {
               <div key={v.id} className="auto-card">
                 <div style={{ fontWeight: 600 }}>{v.title_ru}</div>
                 <div className="auto-muted" style={{ fontSize: 13, marginBottom: 8 }}>
-                  {v.year} · {fmtPrice(v.current_price_nzd)}
+                  {v.year} · {formatRub(v.current_price_nzd)}
                 </div>
                 <Link to={`/auto/vehicle/${v.id}`} className="auto-btn">Открыть</Link>
               </div>
@@ -141,7 +142,7 @@ export default function AutoDashboard() {
                 <tr key={i.id} data-testid={`invoice-row-${i.id}`}>
                   <td>{i.id.slice(0, 8)}</td>
                   <td>{i.vehicle_id.slice(0, 8)}</td>
-                  <td>{fmtPrice(i.total_nzd)}</td>
+                  <td>{formatRub(i.total_nzd)}</td>
                   <td><span className="auto-badge">{i.status}</span></td>
                   <td>{new Date(i.created_at).toLocaleString("ru-RU")}</td>
                 </tr>

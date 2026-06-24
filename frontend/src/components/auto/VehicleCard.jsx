@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Calculator } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
 import LandedPriceModal from "./LandedPriceModal";
+import { getFxRate, formatRub } from "../../services/autoCurrency";
 
 const STATUS_BADGE = {
   available: { cls: "auto-badge-success", text: "Доступен" },
@@ -19,14 +20,15 @@ const LISTING_LABEL = {
   inquiry_only: "По запросу",
 };
 
-function fmtPrice(v) {
-  if (v == null) return "—";
-  return `NZ$${Number(v).toLocaleString("en-NZ", { maximumFractionDigits: 0 })}`;
-}
-
 function fmtKm(v) {
   if (v == null) return "—";
   return `${Number(v).toLocaleString("ru-RU")} км`;
+}
+
+// Internal/admin-only formatter (kept for staff-facing pages where NZD is needed).
+function fmtPrice(v) {
+  if (v == null) return "—";
+  return `NZ$${Number(v).toLocaleString("en-NZ", { maximumFractionDigits: 0 })}`;
 }
 
 function fmtDate(v) {
@@ -40,6 +42,8 @@ function fmtDate(v) {
 
 export default function VehicleCard({ vehicle }) {
   const [landedOpen, setLandedOpen] = useState(false);
+  const [, setFx] = useState(null);
+  useEffect(() => { getFxRate().then(setFx); }, []);
   const status = STATUS_BADGE[vehicle.status] || { cls: "", text: vehicle.status };
   const localImages = vehicle.local_images || [];
   const sourceImages = vehicle.images || vehicle.source_images || [];
@@ -74,8 +78,8 @@ export default function VehicleCard({ vehicle }) {
 
         <div className="vehicle-card__price-row">
           <div>
-            <div className="auto-muted vehicle-card__price-label">Цена в НЗ · FOB</div>
-            <div className="vehicle-card__price">{fmtPrice(vehicle.current_price_nzd)}</div>
+            <div className="auto-muted vehicle-card__price-label">Цена · с аукциона</div>
+            <div className="vehicle-card__price">{formatRub(vehicle.current_price_nzd)}</div>
           </div>
           {vehicle.auction_end_time ? (
             <div className="vehicle-card__countdown">
