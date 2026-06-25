@@ -113,7 +113,7 @@ async def _campaign_loop(db) -> None:
 
 def start(db) -> None:
     """Start both background loops. Safe to call once at startup."""
-    global _auc_task, _camp_task
+    global _auc_task, _camp_task, _intel_task
     loop = asyncio.get_event_loop()
     if not _auc_task or _auc_task.done():
         _auc_task = loop.create_task(_refresh_loop(db), name="auto-auctions-refresh")
@@ -121,6 +121,37 @@ def start(db) -> None:
     if not _camp_task or _camp_task.done():
         _camp_task = loop.create_task(_campaign_loop(db), name="auto-email-campaigns")
         logger.info("[scheduler] started email-campaigns task (2x/day)")
+    if not _intel_task or _intel_task.done():
+        _intel_task = loop.create_task(_intel_loop(db), name="auto-intel-estimates")
+        logger.info("[scheduler] started AI-estimate generator (hourly)")
+
+
+_intel_task = None
+
+
+async def _intel_loop(db) -> None:
+    """Hourly: generate AI estimates for any vehicles without one. Each run
+    handles at most 20 to stay under the LLM rate-limit and the budget."""
+    while True:
+        try:
+            from services.auto_intel_engine import estimate_for_vehicle
+            cursor = db.auto_vehicles.find(
+                {"status": {"$ne": "hidden"}, "ai_estimate": {"$exists": False}}
+            ).limit(20)
+            done = 0
+            async for v in cursor:
+                try:
+                    await estimate_for_vehicle(db, v)
+                    done += 1
+                except Exception:
+                    pass
+            if done:
+                logger.info(f"[scheduler] AI estimates generated: {done}")
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"[scheduler] AI estimate loop failed: {e}")
+        await asyncio.sleep(3600)  # 1 hour
 
 
 def stop() -> None:

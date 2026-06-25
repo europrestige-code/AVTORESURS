@@ -700,6 +700,139 @@ async def body_type_counts(svc: AutoService = Depends(get_auto_service)):
     return {"items": items, "total": sum(i["count"] for i in items)}
 
 
+# ===== Market Intelligence Engine — Phase 1 =====
+
+
+@router.get("/admin/intel/credentials")
+async def admin_intel_credentials_list(
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    from models.auto_credentials import to_admin_view
+    items = [to_admin_view(d) async for d in db.auto_source_credentials.find().sort("source", 1)]
+    return {"items": items}
+
+
+@router.post("/admin/intel/credentials")
+async def admin_intel_credentials_upsert(
+    payload: Dict[str, Any],
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    from models.auto_credentials import (
+        AutoSourceCredential, AutoSourceCredentialCreate, encrypt, to_admin_view,
+    )
+    create = AutoSourceCredentialCreate(**payload)
+    existing = await db.auto_source_credentials.find_one(
+        {"source": create.source, "kind": create.kind}
+    )
+    enc = encrypt(create.password)
+    now = datetime.utcnow()
+    if existing:
+        upd = {
+            "username": create.username,
+            "password_encrypted": enc,
+            "label": create.label,
+            "extra_json": create.extra_json,
+            "enabled": create.enabled,
+            "updated_at": now,
+        }
+        await db.auto_source_credentials.update_one({"id": existing["id"]}, {"$set": upd})
+        doc = await db.auto_source_credentials.find_one({"id": existing["id"]})
+    else:
+        rec = AutoSourceCredential(
+            source=create.source,
+            kind=create.kind,
+            label=create.label,
+            username=create.username,
+            password_encrypted=enc,
+            extra_json=create.extra_json,
+            enabled=create.enabled,
+        )
+        await db.auto_source_credentials.insert_one(rec.dict())
+        doc = rec.dict()
+    return to_admin_view(doc)
+
+
+@router.delete("/admin/intel/credentials/{cred_id}")
+async def admin_intel_credentials_delete(
+    cred_id: str,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    await db.auto_source_credentials.delete_one({"id": cred_id})
+    return {"ok": True}
+
+
+@router.post("/admin/intel/capture/{source}")
+async def admin_intel_capture(
+    source: str,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Trigger a buyer-session capture for a single source. Runs synchronously
+    so the admin gets status back; production scheduler also runs it on cron."""
+    from services.auto_intel_capture import capture_for_source
+    return await capture_for_source(db, source)
+
+
+@router.get("/admin/intel/observations")
+async def admin_intel_observations(
+    source: Optional[str] = None,
+    limit: int = 100,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    q: Dict[str, Any] = {}
+    if source:
+        q["source"] = source
+    items = []
+    async for d in db.auction_observations.find(q).sort("observed_at", -1).limit(int(limit)):
+        d.pop("_id", None)
+        for k in ("observed_at", "auction_at"):
+            v = d.get(k)
+            if isinstance(v, datetime):
+                d[k] = v.isoformat()
+        items.append(d)
+    return {"items": items}
+
+
+@router.post("/admin/intel/estimate/{vehicle_id}")
+async def admin_intel_estimate(
+    vehicle_id: str,
+    force: bool = False,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Run the AI estimator for ONE vehicle and persist the result."""
+    from services.auto_intel_engine import estimate_for_vehicle
+    v = await db.auto_vehicles.find_one({"id": vehicle_id})
+    if not v:
+        raise HTTPException(404, "Авто не найдено.")
+    est = await estimate_for_vehicle(db, v, force=force)
+    return {"ok": True, "estimate": est}
+
+
+@router.post("/admin/intel/estimate-batch")
+async def admin_intel_estimate_batch(
+    limit: int = 25,
+    only_missing: bool = True,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Generate AI estimates for the next N vehicles without one."""
+    from services.auto_intel_engine import estimate_for_vehicle
+    q: Dict[str, Any] = {"status": {"$ne": "hidden"}}
+    if only_missing:
+        q["ai_estimate"] = {"$exists": False}
+    done = 0
+    async for v in db.auto_vehicles.find(q).limit(int(limit)):
+        await estimate_for_vehicle(db, v)
+        done += 1
+    return {"ok": True, "processed": done}
+
+
+
 # ===== Engagement: interests + offers + market summary =====
 
 from models.auto_engagement import AutoInterestCreate, AutoOfferCreate
