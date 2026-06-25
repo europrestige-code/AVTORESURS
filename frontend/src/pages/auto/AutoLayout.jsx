@@ -36,8 +36,8 @@ export default function AutoLayout() {
             <img
               src="/branding/avtoresurs-lockup.png?v=3"
               alt="АвтоРесурс — автомобили со всего мира"
-              className="h-12 w-auto select-none lg:h-14"
-              style={{ minWidth: 200 }}
+              className="h-[55px] w-auto select-none lg:h-[64px]"
+              style={{ minWidth: 230 }}
               draggable="false"
             />
           </NavLink>
