@@ -1,5 +1,3 @@
-# BuyAnywhere Auto — test credentials (seeded by `python /app/backend/seed_auto.py`)
-
 ## Admin
 - Email: admin@buyanywhere.com
 - Password: admin12345
@@ -21,3 +19,5 @@
 - Auth endpoint: POST `${REACT_APP_BACKEND_URL}/api/auth/login` with `{ email, password }` returns `access_token`.
 - BuyAnywhere admin panel still uses the legacy hardcoded admin (`/api/admin/auth/login` / any password).
 - Auto admin endpoints (`/api/auto/admin/...`) use the standard customer JWT and require `users.role == "admin"`.
+- The chat widget has a new "Подобрать авто за 60 секунд" CTA that opens a 5-step AI quiz. No login required.
+- Admin → Клиенты tab now lists registered users + anonymous leads with activity counts and a click-to-open CRM timeline drawer.

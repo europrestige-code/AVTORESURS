@@ -1,0 +1,27 @@
+{
+  "summary": "Iter11 — verified pure structural refactor of auto_routes.py into routes/auto/{chat_quiz,engagement,admin_crm,_deps,__init__}.py. NO behavioural diff vs iter10. BACKEND 15/15 new iter11 + 11/11 iter10 regression — 26/26 pytest GREEN. FRONTEND smoke on /auto, /auto/catalog?country=AU and /auto/admin all GREEN.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter11_refactor_regression.py",
+    "/app/backend/tests/test_iter10_quiz_crm.py",
+    "/app/test_reports/pytest/iter11.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/auto/__init__.py builds its own APIRouter(prefix='/api/auto') and includes the three sub-routers — but server.py keeps importing `from routes.auto_routes import router`, which re-includes the same sub-routers a SECOND time at the bottom of auto_routes.py. The __init__.py aggregator is effectively dead code today; either delete it or wire server.py to use it as the single source of truth to avoid future double-mount accidents.",
+    "auto_routes.py is still ~1700 lines after the extraction. The leftover groups (Stripe webhooks, deposits, market-intel, email campaigns, importers, admin vehicle CRUD) are the next obvious candidates to peel into routes/auto/{payments,intel,email,importers,vehicles}.py — keeps the refactor momentum.",
+    "POST /api/auto/interests requires both `name` AND `phone` even when no Bearer is sent (returns 422). The iter11 review brief used the word 'anonymous' but the schema is actually 'unauthenticated-but-identified'. If truly anonymous interests are a product goal, those fields need to be Optional in AutoInterestCreate and synthesised from JWT when present.",
+    "/api/auto/chat response shape is not asserted by either iter10 or iter11 tests (only status=200). Worth adding a contract test once the message envelope stabilises."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter11_refactor_regression.py (NEW — 15 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (15/15 iter11 + 11/11 iter10 = 26/26)", "frontend": "100%"},
+  "test_credentials": "admin@buyanywhere.com / admin12345; client@buyanywhere.com / client12345",
+  "seed_data_creation": "Iter11 inserted: lead +79991117811 (TEST_iter11_quiz via /quiz/submit), lead +79991117812 (TEST_iter11_user via /interests with name+phone), lead +79991117813 (TEST_iter11_anon via /interests without auth, name+phone). All visible in /auto/admin → Клиенты as kind=lead and easy to clean up by TEST_iter11_ prefix.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter11 PASSED. Endpoints verified post-refactor: GET /api/auto/quiz/meta 200, POST /api/auto/quiz/submit 200 happy + 400 on empty name/contact, POST /api/auto/chat 200, GET /api/auto/vehicles 200, POST /api/auto/interests 200 (REQUIRES name+phone — body returns 422 if missing), GET /api/auto/market-summary 200, GET /api/auto/ending-soon 200, POST /api/auto/offers 401 without Bearer, GET /api/auto/admin/interests 200/401, GET /api/auto/admin/clients 200 with required keys (kind, interests, offers, bids, chat_messages, quiz_leads, last_activity, total_events) and both kind=user + kind=lead present, GET /api/auto/admin/clients/{uid}/timeline 200 + 404 for unknown id. FRONTEND smoke: /auto FAB data-testid=chat-fab → opens widget → chat-quiz-cta with exact label 'Подобрать авто за 60 секунд' visible. /auto/catalog?country=AU shows 3 cards each with RUB primary (e.g. '1 066 165 ₽') and NZD secondary (e.g. 'NZ$24,500'). /auto/admin Клиенты tab shows 12 admin-client-row-* entries; clicking the first opens crm-timeline-drawer with event pills. Sub-routers under /app/backend/routes/auto/ are correctly mounted via include_router in auto_routes.py — the parallel APIRouter in /app/backend/routes/auto/__init__.py is currently UNUSED dead code (see critical comment).",
+  "rca of the issue": "N/A — pure regression confirmed; no functional drift introduced by the refactor."
+}

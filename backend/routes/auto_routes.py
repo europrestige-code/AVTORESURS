@@ -578,71 +578,8 @@ async def contacts():
     }
 
 
-# ----- AI chat (Тина) -----
-
-@router.post("/chat")
-async def chat(
-    payload: Dict[str, Any] = Body(...),
-    user: Optional[Dict[str, Any]] = Depends(get_optional_user),
-    db=Depends(get_db),
-):
-    """Russian AI assistant trained on the АвтоРесурс business model.
-
-    Body: {message: str, history?: [{role,content}], session_id?: str}.
-    Anonymous use is allowed; logged-in users have their conversation
-    history persisted to auto_chat_messages for follow-up by support.
-    """
-    from services.auto_chat_service import get_chat_service
-    msg = (payload.get("message") or "").strip()
-    if not msg:
-        raise HTTPException(400, "Пустое сообщение.")
-    history = payload.get("history") or []
-    session_id = payload.get("session_id")
-    svc = get_chat_service()
-    result = await svc.reply(history, msg, session_id=session_id)
-    # Persist for logged-in users
-    if user:
-        from datetime import datetime as _dt
-        sid = result.get("session_id") or session_id
-        await db.auto_chat_messages.insert_many([
-            {"session_id": sid, "user_id": user["id"], "role": "user",
-             "content": msg, "created_at": _dt.utcnow()},
-            {"session_id": sid, "user_id": user["id"], "role": "assistant",
-             "content": result.get("content", ""), "created_at": _dt.utcnow()},
-        ])
-    return result
-
-
-# ----- AI Подборщик (quiz) -----
-
-@router.get("/quiz/meta")
-async def quiz_meta():
-    """Static taxonomy used by the quiz wizard in the chat widget."""
-    from services.auto_quiz_service import get_quiz_meta
-    return get_quiz_meta()
-
-
-@router.post("/quiz/submit")
-async def quiz_submit(
-    payload: Dict[str, Any] = Body(...),
-    user: Optional[Dict[str, Any]] = Depends(get_optional_user),
-    db=Depends(get_db),
-):
-    """Accept a completed quiz, store it as a lead, and return matches."""
-    from services.auto_fx_service import get_fx_rate
-    from services.auto_quiz_service import AutoQuizService
-    fx = await get_fx_rate()
-    fx_rate = float(fx.get("nzd_to_rub_display") or fx.get("nzd_to_rub_spot") or 57.68)
-    svc = AutoQuizService(db)
-    try:
-        result = await svc.submit(
-            payload,
-            fx_rate=fx_rate,
-            user_id=user.get("id") if user else None,
-        )
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    return result
+# ----- AI chat & АИ-подборщик moved to routes/auto/chat_quiz.py -----
+# Endpoints: POST /chat, GET /quiz/meta, POST /quiz/submit
 
 @router.post("/admin/images/backfill-branding")
 async def admin_backfill_branding(
@@ -912,116 +849,9 @@ async def admin_refund_deposit(
     return {"ok": True, "deposit_id": deposit_id, "reason": reason}
 
 
-@router.post("/interests")
-async def create_interest(
-    payload: AutoInterestCreate,
-    user: Optional[Dict[str, Any]] = Depends(get_optional_user),
-    eng=Depends(get_engagement_service),
-):
-    """Anyone (visitor or authed) can express interest. Used by the lead
-    modal and the "Выразить интерес" CTA on the vehicle page."""
-    if not payload.name or not payload.phone:
-        raise HTTPException(400, "Укажите имя и телефон.")
-    return await eng.create_interest(payload, user_id=user.get("id") if user else None)
-
-
-@router.post("/offers")
-async def create_offer(
-    payload: AutoOfferCreate,
-    user: Dict[str, Any] = Depends(require_user),
-    eng=Depends(get_engagement_service),
-):
-    """Authed user posts a non-binding *Предложение цены*. Does NOT require
-    a deposit. Stored separately from `auto_bids` to keep the legal/UX
-    distinction (offer = soft, bid = binding instruction)."""
-    if not payload.offer_price_nzd or payload.offer_price_nzd <= 0:
-        raise HTTPException(400, "Сумма предложения должна быть положительной.")
-    return await eng.create_offer(payload, user_id=user["id"])
-
-
-@router.get("/my/offers")
-async def list_my_offers(
-    user: Dict[str, Any] = Depends(require_user),
-    eng=Depends(get_engagement_service),
-):
-    return {"items": await eng.my_offers(user["id"])}
-
-
-@router.get("/vehicles/{vehicle_id}/engagement")
-async def vehicle_engagement(vehicle_id: str, eng=Depends(get_engagement_service)):
-    counts = await eng.engagement_counts(vehicle_id)
-    return counts.dict()
-
-
-@router.get("/market-summary")
-async def market_summary(eng=Depends(get_engagement_service)):
-    """Live numbers for the homepage strip — total available, ending soon,
-    damaged, buy-now, leads in the last 24h. Cheap aggregate, OK to call
-    on every page load."""
-    return await eng.market_summary()
-
-
-@router.get("/ending-soon")
-async def vehicles_ending_soon(
-    limit: int = 8,
-    eng=Depends(get_engagement_service),
-):
-    from services.auto_fx_service import get_fx_rate
-    items = await eng.ending_soon(limit=limit)
-    fx = await get_fx_rate()
-    return {"items": items, "fx_rate": fx}
-
-
-# ----- Admin: interests + offers management -----
-
-@router.get("/admin/interests")
-async def admin_list_interests(
-    status: Optional[str] = None,
-    limit: int = 100,
-    _: Dict[str, Any] = Depends(require_admin),
-    eng=Depends(get_engagement_service),
-):
-    return {"items": await eng.list_interests(status=status, limit=limit)}
-
-
-@router.patch("/admin/interests/{interest_id}/status")
-async def admin_update_interest(
-    interest_id: str,
-    payload: Dict[str, Any],
-    _: Dict[str, Any] = Depends(require_admin),
-    eng=Depends(get_engagement_service),
-):
-    res = await eng.update_interest_status(interest_id, payload.get("status", ""))
-    if not res:
-        raise HTTPException(404, "Лид не найден или статус неверный.")
-    return res
-
-
-@router.get("/admin/offers")
-async def admin_list_offers(
-    status: Optional[str] = None,
-    limit: int = 100,
-    _: Dict[str, Any] = Depends(require_admin),
-    eng=Depends(get_engagement_service),
-):
-    return {"items": await eng.list_offers(status=status, limit=limit)}
-
-
-@router.patch("/admin/offers/{offer_id}/status")
-async def admin_update_offer(
-    offer_id: str,
-    payload: Dict[str, Any],
-    _: Dict[str, Any] = Depends(require_admin),
-    eng=Depends(get_engagement_service),
-):
-    res = await eng.update_offer_status(
-        offer_id,
-        payload.get("status", ""),
-        admin_response=payload.get("admin_response"),
-    )
-    if not res:
-        raise HTTPException(404, "Предложение не найдено или статус неверный.")
-    return res
+# ----- Engagement endpoints (interests, offers, market) moved to
+# routes/auto/engagement.py and admin lead-queue endpoints
+# moved to routes/auto/admin_crm.py. -----
 
 
 @router.get("/catalog-summary")
@@ -1628,71 +1458,8 @@ async def admin_add_logistics_event(
     return await svc.add_logistics_event(vehicle_id, payload)
 
 
-@router.get("/admin/clients")
-async def admin_list_clients(
-    limit: int = 200,
-    _: Dict[str, Any] = Depends(require_admin),
-    db=Depends(get_db),
-):
-    """Deep CRM client list with merged activity counts (interests, offers,
-    bids, chat sessions, quiz leads) and a `last_activity` timestamp so the
-    panel can be sorted by recency."""
-    from services.auto_crm_timeline import AutoCrmTimelineService
-    return await AutoCrmTimelineService(db).list_clients(limit=limit)
-
-
-@router.get("/admin/clients/{user_id}/timeline")
-async def admin_client_timeline(
-    user_id: str,
-    _: Dict[str, Any] = Depends(require_admin),
-    db=Depends(get_db),
-):
-    """Return a single merged chronological timeline (all stages, all
-    interactions) for one registered client."""
-    from services.auto_crm_timeline import AutoCrmTimelineService
-    res = await AutoCrmTimelineService(db).timeline_for_user(user_id)
-    if not res.get("client"):
-        raise HTTPException(404, "Клиент не найден.")
-    return res
-
-
-@router.get("/admin/clients/lead/{phone}/timeline")
-async def admin_lead_timeline(
-    phone: str,
-    _: Dict[str, Any] = Depends(require_admin),
-    db=Depends(get_db),
-):
-    """Timeline for an anonymous lead (no registered account) — keyed by
-    phone number. Sales uses this to follow up before the lead converts."""
-    from services.auto_crm_timeline import AutoCrmTimelineService
-    return await AutoCrmTimelineService(db).timeline_by_phone(phone)
-
-
-@router.post("/admin/vehicles/{vehicle_id}/mark-won")
-async def admin_mark_vehicle_won(
-    vehicle_id: str,
-    _: Dict[str, Any] = Depends(require_admin),
-    svc: AutoService = Depends(get_auto_service),
-):
-    """Convenience action: flip vehicle to status='won' which triggers CRM linkage."""
-    updated = await svc.update_vehicle(vehicle_id, {"status": AutoVehicleStatus.WON.value})
-    crm = await svc.db.crm_orders.find_one({"auto_vehicle_id": vehicle_id})
-    if crm:
-        crm.pop("_id", None)
-    return {"vehicle": updated, "crm_order": crm}
-
-
-@router.get("/admin/crm-orders")
-async def admin_list_crm_orders(
-    _: Dict[str, Any] = Depends(require_admin),
-    db=Depends(get_db),
-):
-    """List CRM orders that originated from BuyAnywhere Auto."""
-    items: List[Dict[str, Any]] = []
-    async for o in db.crm_orders.find({"source": "buyanywhere_auto"}).sort("created_at", -1):
-        o.pop("_id", None)
-        items.append(o)
-    return items
+# ----- Admin CRM endpoints (clients, timeline, crm-orders, mark-won)
+# moved to routes/auto/admin_crm.py. -----
 
 
 # =============================================================================
@@ -1928,3 +1695,19 @@ async def vehicles_similar(
             seen.add(d["id"])
             if len(items) >= int(limit): break
     return {"items": items[: int(limit)]}
+
+
+
+# =============================================================================
+# Sub-routers — themed groups extracted from this file (chat/quiz, engagement,
+# admin CRM). They live under routes/auto/ and share the dependency helpers
+# above so we don't break import sites that still do
+# `from routes.auto_routes import router`.
+# =============================================================================
+from routes.auto import chat_quiz as _chat_quiz_module
+from routes.auto import engagement as _engagement_module
+from routes.auto import admin_crm as _admin_crm_module
+
+router.include_router(_chat_quiz_module.router)
+router.include_router(_engagement_module.router)
+router.include_router(_admin_crm_module.router)
