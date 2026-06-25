@@ -46,19 +46,20 @@ The DB stores them in separate collections (`auto_offers` vs `auto_bids`).
 ## V2 backlog (post-MVP — superseded by the iter10–iter13 list above)
 - (see «Done in iter10–iter13» section for completed P1 items)
 
-## Done in iter10–iter13 (25.06.2026)
-- **RUB primary / NZD secondary** price display across `PriceGuidance.jsx` and `VehicleCard.jsx`.
-- **АИ-подборщик** — 6-step quiz inside the Татьяна chat widget (added repair + buyer-type steps). Quiz is now the DEFAULT mode when the chat opens — Tatiana sells first, answers questions second (link «Просто задать вопрос →»).
-- **Deep CRM timeline** — Admin → Клиенты merges users + leads with activity counts and a chronological event drawer (6 event types).
-- **auto_routes.py refactor** — chat/quiz, engagement, admin-CRM and saved-searches extracted to `routes/auto/{chat_quiz, engagement, admin_crm, saved_search, _deps}.py`.
-- **Saved Searches** — `services/auto_saved_search_service.py` + `routes/auto/saved_search.py`. `POST /saved-searches`, `GET /saved-searches`, `DELETE`, `PATCH /toggle`, `POST /saved-searches/preview` (public). Scheduler runs every 15 min via `_saved_search_loop`. Notifications go through `services/auto_notify_service.py`:
-   - **Resend** transactional email (env `RESEND_API_KEY`, `SENDER_EMAIL`).
-   - **Telegram bot** (env `TELEGRAM_BOT_TOKEN`, username `AvtoresursAlertsBot`). Binding flow: `POST /telegram/start-binding` → user opens deep-link → `POST /telegram/webhook` receives `/start link_<token>` and attaches chat_id.
-   - New page `/auto/my/searches` with Telegram-binding UI and saved-search list.
-   - «Сохранить поиск» CTA next to the catalog filters.
-- **Header overflow fix** (iter13) — «Календарь аукционов» → «Календарь», «Зарегистрироваться» → «Регистрация», max-w-[1600px], compact buttons. Verified 1280/1366/1440/1920.
-- **Otahuhu image fix** (iter13) — replaced 404 Unsplash photo, hardened onError fallback chain → rotation → local placeholder.
-- **Manheim NZ in auctions calendar** (iter13) — new `parse_manheim_page` + `fetch_manheim_auctions`. `refresh()` now returns `by_source={turners,manheim}`. 10 Manheim events surface alongside Turners on the homepage and `/auto/auctions`.
+## Done in iter10–iter16 (25.06.2026)
+- **Iter10–13** — RUB/NZD display, АИ-подборщик, Deep CRM timeline, refactor of auto_routes.py, Saved Searches (Resend email + Telegram bot), header overflow fix, Otahuhu image fix, Manheim NZ auctions in calendar.
+- **Iter14** — Internal auction mirror (no more outbound redirects to Turners/Manheim). New page `/auto/auctions/event/:eventId`, endpoint `GET /api/auto/auctions/events/{event_id}`.
+- **Iter15** — Bulk catalogue mirror. Expanded TurnersImporter (all 24 branches + damaged + trucks), Manheim paginates 50 pages × 3 search paths, Pickles paginates. New admin endpoint `POST /admin/sources/import-all` runs as a background task with `GET /admin/sources/import-status` polling. Catalogue grew **from 31 → 1608 vehicles** (832 Turners + 732 Manheim + 31 Pickles), cleaned 8 fake aggregator tiles.
+- **Iter16** — Tiered payment-terms policy.
+   - Base deposit NZ$1,000 (lots ≤ NZ$20,000)
+   - 20% deposit (NZ$20,000 < lots ≤ NZ$40,000)
+   - 30% deposit (lots > NZ$40,000)
+   - Full payment within 24h of winning, otherwise deposit forfeited.
+   - Service: `services/auto_payment_terms.py` (`required_deposit_nzd`, `payment_terms_summary`).
+   - Endpoints: `GET /api/auto/payment-terms` (public), `GET /api/auto/vehicles/{id}/deposit-required`.
+   - `place_bid()` enforces the per-vehicle deposit before accepting a bid (403 with required amount).
+   - Component: `PaymentTermsBanner` (4 tier rows + per-vehicle highlight, with 1-hour localStorage cache).
+   - Mounted on `/auto/vehicle/:id` between PriceGuidance and EngagementPanel.
 
 ## V2 backlog (post-MVP)
 - 🟡 P1 — Market Intelligence Engine **Phase 2**: Playwright/WebSocket capture for live Simulcast prices (currently AI-estimated)

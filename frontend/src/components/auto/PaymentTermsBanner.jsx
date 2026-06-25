@@ -2,6 +2,22 @@ import React, { useEffect, useState } from "react";
 import { AlertCircle, Clock, CreditCard, Diamond } from "lucide-react";
 import autoApi from "../../services/autoApi";
 
+const CACHE_KEY = "ar_payment_terms_v1";
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1h — static disclosure, safe to cache.
+
+function readCachedTerms() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { at, data } = JSON.parse(raw);
+    if (!at || Date.now() - at > CACHE_TTL_MS) return null;
+    return data;
+  } catch { return null; }
+}
+function writeCachedTerms(data) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data })); } catch { /* quota */ }
+}
+
 /**
  * Universal payment-terms disclosure block. Renders three tiered rules:
  *   1. Base deposit NZ$1,000 for lots up to NZ$20,000
@@ -12,11 +28,15 @@ import autoApi from "../../services/autoApi";
  * Used on vehicle detail, in the bid CTA, and on /auto/fees.
  */
 export default function PaymentTermsBanner({ compact = false, vehicleDeposit = null }) {
-  const [terms, setTerms] = useState(null);
+  const [terms, setTerms] = useState(() => readCachedTerms());
 
   useEffect(() => {
-    autoApi.get("/payment-terms").then((r) => setTerms(r.data)).catch(() => {});
-  }, []);
+    if (terms) return; // already cached
+    autoApi
+      .get("/payment-terms")
+      .then((r) => { setTerms(r.data); writeCachedTerms(r.data); })
+      .catch(() => {});
+  }, [terms]);
 
   if (!terms) return null;
 
