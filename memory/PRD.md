@@ -43,25 +43,34 @@ The DB stores them in separate collections (`auto_offers` vs `auto_bids`).
 - Admin: vehicles, **leads (interests + offers)**, bids, deposits, sources,
   import, branding, calendar, invoices, logistics, CRM, clients, campaigns, settings
 
+## V2 backlog (post-MVP — superseded by the iter10–iter13 list above)
+- (see «Done in iter10–iter13» section for completed P1 items)
+
+## Done in iter10–iter13 (25.06.2026)
+- **RUB primary / NZD secondary** price display across `PriceGuidance.jsx` and `VehicleCard.jsx`.
+- **АИ-подборщик** — 6-step quiz inside the Татьяна chat widget (added repair + buyer-type steps). Quiz is now the DEFAULT mode when the chat opens — Tatiana sells first, answers questions second (link «Просто задать вопрос →»).
+- **Deep CRM timeline** — Admin → Клиенты merges users + leads with activity counts and a chronological event drawer (6 event types).
+- **auto_routes.py refactor** — chat/quiz, engagement, admin-CRM and saved-searches extracted to `routes/auto/{chat_quiz, engagement, admin_crm, saved_search, _deps}.py`.
+- **Saved Searches** — `services/auto_saved_search_service.py` + `routes/auto/saved_search.py`. `POST /saved-searches`, `GET /saved-searches`, `DELETE`, `PATCH /toggle`, `POST /saved-searches/preview` (public). Scheduler runs every 15 min via `_saved_search_loop`. Notifications go through `services/auto_notify_service.py`:
+   - **Resend** transactional email (env `RESEND_API_KEY`, `SENDER_EMAIL`).
+   - **Telegram bot** (env `TELEGRAM_BOT_TOKEN`, username `AvtoresursAlertsBot`). Binding flow: `POST /telegram/start-binding` → user opens deep-link → `POST /telegram/webhook` receives `/start link_<token>` and attaches chat_id.
+   - New page `/auto/my/searches` with Telegram-binding UI and saved-search list.
+   - «Сохранить поиск» CTA next to the catalog filters.
+- **Header overflow fix** (iter13) — «Календарь аукционов» → «Календарь», «Зарегистрироваться» → «Регистрация», max-w-[1600px], compact buttons. Verified 1280/1366/1440/1920.
+- **Otahuhu image fix** (iter13) — replaced 404 Unsplash photo, hardened onError fallback chain → rotation → local placeholder.
+- **Manheim NZ in auctions calendar** (iter13) — new `parse_manheim_page` + `fetch_manheim_auctions`. `refresh()` now returns `by_source={turners,manheim}`. 10 Manheim events surface alongside Turners on the homepage and `/auto/auctions`.
+
 ## V2 backlog (post-MVP)
-- Migrate 36 hex literals to `--ar-*` CSS tokens
-- Motorbikes vertical (Turners + Manheim) — UI/routes ready; data pipeline pending
-- Спецтехника vertical — UI/routes ready; data pipeline pending
-- Refunds endpoint for unsuccessful bids (done — `/api/auto/admin/deposits/{id}/refund`)
-- 2FA admin login
-- "Похожие проданы за NZ$X-Y" block (needs sold-price history)
-- Phase 4 (Japanese auctions) — declined by user
-- Mobile / separate admin app
-
-## Done in iter10–iter11 (25.06.2026)
-- **RUB primary / NZD secondary** price display across `PriceGuidance.jsx` (two-line layout) and `VehicleCard.jsx` (RUB main, NZD muted subtitle).
-- **АИ-подборщик** — 5-step quiz inside the Татьяна chat widget. CTA `Подобрать авто за 60 секунд`. Posts to `/api/auto/quiz/submit`, persists to `auto_quiz_leads`, mirrors into `auto_interests (source='quiz')`, returns ranked matches (`AutoQuizService._match`).
-- **Deep CRM timeline** — `routes/auto/admin_crm.py` + `services/auto_crm_timeline.py`. Admin → Клиенты merges registered users + anonymous leads with `interests/offers/bids/chat_messages/quiz_leads` counts, `last_activity`, `total_events`. Click row → drawer shows a merged chronological timeline of all six event types with coloured pills.
-- **auto_routes.py refactor** — extracted chat/quiz, engagement, admin-CRM endpoints into `routes/auto/{chat_quiz, engagement, admin_crm, _deps}.py`. Aggregated via `router.include_router` at the bottom of `auto_routes.py`. 26/26 pytest GREEN (iter10 + iter11).
-
-## Still pending refactor
-- Peel out `routes/auto/{intel, sources, importers, payments, email, vehicles}.py` so `auto_routes.py` (~1700 lines) keeps shrinking.
-- Add `routes/auto/__init__.py` aggregator or delete `routes/auto/_deps.py` import duplication once additional sub-routers are extracted.
+- 🟡 P1 — Market Intelligence Engine **Phase 2**: Playwright/WebSocket capture for live Simulcast prices (currently AI-estimated)
+- 🟢 P2 — Виджет «Похожие проданы за NZ$X–Y» on the vehicle page (needs sold-price history)
+- 🟢 P2 — 2FA admin login
+- 🟢 P2 — Real scrapers for Motorbikes / Trucks / Heavy Machinery verticals (UI + routes already wired)
+- 🟢 P2 — Continue extracting `routes/auto/{intel,sources,importers,payments,email,vehicles}.py` from the remaining 1700-line `auto_routes.py`
+- 🟢 P2 — Self-host branch hero photos in `/public/branding/` to remove Unsplash hot-link risk
+- 🟢 P2 — Resend domain verification for production (currently only `europrestige@gmail.com` receives in test mode)
+- 🟢 P2 — Quiz → auto-create a Saved Search from the user's answers
+- 🟢 P2 — Mobile / separate admin app
+- ⛔ P4 (declined) — Japanese auctions
 
 ## Production launch checklist
 1. Profile → Universal Key — ensure balance for chat + email

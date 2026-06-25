@@ -506,8 +506,22 @@ function AuctionCard({ a, now, i }) {
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           loading="lazy"
           onError={(ev) => {
-            ev.currentTarget.onerror = null;
-            ev.currentTarget.src = AUCTION_IMAGES[i % AUCTION_IMAGES.length];
+            // If the Unsplash photo was deleted upstream (HTTP 404 → broken
+            // image icon), fall back to the curated rotation, then to the
+            // local placeholder. We swap the handler each step so we never
+            // create an infinite onError loop.
+            const el = ev.currentTarget;
+            const rot = AUCTION_IMAGES[i % AUCTION_IMAGES.length];
+            if (el.src !== rot) {
+              el.src = rot;
+              el.onerror = () => {
+                el.onerror = null;
+                el.src = FALLBACK_BRANCH_IMG;
+              };
+            } else {
+              el.onerror = null;
+              el.src = FALLBACK_BRANCH_IMG;
+            }
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/70" />
