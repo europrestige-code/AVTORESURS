@@ -10,7 +10,7 @@ import "./auto.css";
 const NAV = [
   { to: "/auto",                end: true,  label: "Главная" },
   { to: "/auto/catalog",                    label: "Каталог" },
-  { to: "/auto/auctions",                   label: "Календарь аукционов" },
+  { to: "/auto/auctions",                   label: "Календарь" },
   { to: "/auto/damaged",                    label: "Повреждённые" },
   { to: "/auto/end-of-life",                label: "End of Life" },
   { to: "/auto/buynow",                     label: "Купить сейчас" },
@@ -31,18 +31,18 @@ export default function AutoLayout() {
 
       {/* Sticky main header — sits below the contact marquee. */}
       <header className="sticky top-[28px] z-40 border-b border-white/10 bg-[var(--ar-black)]">
-        <div className="mx-auto flex max-w-screen-2xl items-end justify-between gap-6 px-6 py-2">
-          <NavLink to="/auto" end className="flex items-center" data-testid="auto-brand">
+        <div className="mx-auto flex max-w-[1600px] items-end justify-between gap-4 px-5 py-2 xl:gap-6 xl:px-6">
+          <NavLink to="/auto" end className="flex items-center shrink-0" data-testid="auto-brand">
             <img
               src="/branding/avtoresurs-lockup.png?v=3"
               alt="АвтоРесурс — автомобили со всего мира"
-              className="h-[55px] w-auto select-none lg:h-[64px]"
-              style={{ minWidth: 230 }}
+              className="h-[52px] w-auto select-none lg:h-[60px]"
+              style={{ minWidth: 200 }}
               draggable="false"
             />
           </NavLink>
 
-          <nav className="hidden items-center gap-3 text-[13px] text-gray-300 lg:flex xl:gap-5" aria-label="Главная навигация">
+          <nav className="hidden items-center gap-2.5 text-[13px] text-gray-300 xl:flex xl:gap-4" aria-label="Главная навигация">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
@@ -58,32 +58,32 @@ export default function AutoLayout() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
             {isAuthenticated ? (
               <>
-                <NavLink to="/auto/my/searches" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 h-12 text-sm hover:bg-white/10" data-testid="nav-my-searches">
-                  Мои подписки
+                <NavLink to="/auto/my/searches" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 h-11 text-[13px] hover:bg-white/10" data-testid="nav-my-searches">
+                  Подписки
                 </NavLink>
-                <NavLink to="/auto/dashboard" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 h-12 text-sm hover:bg-white/10" data-testid="nav-dashboard">
-                  Мой кабинет
+                <NavLink to="/auto/dashboard" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 h-11 text-[13px] hover:bg-white/10" data-testid="nav-dashboard">
+                  Кабинет
                 </NavLink>
                 {user?.role === "admin" && (
-                  <NavLink to="/auto/admin" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 h-12 text-sm font-semibold text-white hover:bg-blue-500" data-testid="nav-admin">
+                  <NavLink to="/auto/admin" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 h-11 text-[13px] font-semibold text-white hover:bg-blue-500" data-testid="nav-admin">
                     Админ
                   </NavLink>
                 )}
-                <button onClick={logout} className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 h-12 text-sm hover:bg-white/10" data-testid="nav-logout">
+                <button onClick={logout} className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 h-11 text-[13px] hover:bg-white/10" data-testid="nav-logout">
                   Выйти
                 </button>
               </>
             ) : (
               <>
-                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 h-12 text-sm font-medium hover:bg-white/10 transition whitespace-nowrap" data-testid="nav-login">
-                  <User className="mr-2 h-4 w-4" />
+                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 h-11 text-[13px] font-medium hover:bg-white/10 transition whitespace-nowrap" data-testid="nav-login">
+                  <User className="mr-1.5 h-4 w-4" />
                   Войти
                 </NavLink>
-                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 h-12 text-sm font-semibold text-white hover:bg-blue-500 transition whitespace-nowrap" data-testid="nav-register">
-                  Зарегистрироваться
+                <NavLink to="/" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 h-11 text-[13px] font-semibold text-white hover:bg-blue-500 transition whitespace-nowrap" data-testid="nav-register">
+                  Регистрация
                 </NavLink>
               </>
             )}
