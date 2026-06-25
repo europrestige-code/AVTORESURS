@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import autoApi from "../../services/autoApi";
 import { fmtPrice } from "../../components/auto/VehicleCard";
+import AdminMfaGate, { Admin2FASection } from "../../components/auto/AdminMfaGate";
 
-const TABS = ["vehicles", "leads", "bids", "deposits", "sources", "import", "branding", "auctions", "invoices", "logistics", "crm", "clients", "campaigns", "settings"];
+const TABS = ["vehicles", "leads", "bids", "deposits", "sources", "import", "branding", "auctions", "invoices", "logistics", "crm", "clients", "campaigns", "settings", "security"];
 const TAB_LABEL = {
   vehicles: "Автомобили",
   leads: "Лиды",
@@ -19,6 +20,7 @@ const TAB_LABEL = {
   clients: "Клиенты",
   campaigns: "Рассылки",
   settings: "Настройки",
+  security: "Безопасность",
 };
 
 export default function AutoAdmin() {
@@ -36,35 +38,38 @@ export default function AutoAdmin() {
   }
 
   return (
-    <div className="auto-section">
-      <h1 style={{ fontSize: 28, marginTop: 0 }}>Админ-панель</h1>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`auto-btn ${tab === t ? "" : "auto-btn-outline"}`}
-            data-testid={`admin-tab-${t}`}
-          >
-            {TAB_LABEL[t]}
-          </button>
-        ))}
+    <AdminMfaGate>
+      <div className="auto-section">
+        <h1 style={{ fontSize: 28, marginTop: 0 }}>Админ-панель</h1>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          {TABS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`auto-btn ${tab === t ? "" : "auto-btn-outline"}`}
+              data-testid={`admin-tab-${t}`}
+            >
+              {TAB_LABEL[t]}
+            </button>
+          ))}
+        </div>
+        {tab === "vehicles" && <VehiclesTab />}
+        {tab === "bids" && <BidsTab />}
+        {tab === "deposits" && <DepositsTab />}
+        {tab === "sources" && <SourcesTab />}
+        {tab === "import" && <ImportTab />}
+        {tab === "branding" && <BrandingTab />}
+        {tab === "auctions" && <AuctionsTab />}
+        {tab === "invoices" && <InvoicesTab />}
+        {tab === "logistics" && <LogisticsTab />}
+        {tab === "crm" && <CrmTab />}
+        {tab === "clients" && <ClientsTab />}
+        {tab === "campaigns" && <CampaignsTab />}
+        {tab === "settings" && <SettingsTab />}
+        {tab === "leads" && <LeadsTab />}
+        {tab === "security" && <Admin2FASection />}
       </div>
-      {tab === "vehicles" && <VehiclesTab />}
-      {tab === "bids" && <BidsTab />}
-      {tab === "deposits" && <DepositsTab />}
-      {tab === "sources" && <SourcesTab />}
-      {tab === "import" && <ImportTab />}
-      {tab === "branding" && <BrandingTab />}
-      {tab === "auctions" && <AuctionsTab />}
-      {tab === "invoices" && <InvoicesTab />}
-      {tab === "logistics" && <LogisticsTab />}
-      {tab === "crm" && <CrmTab />}
-      {tab === "clients" && <ClientsTab />}
-      {tab === "campaigns" && <CampaignsTab />}
-      {tab === "settings" && <SettingsTab />}
-      {tab === "leads" && <LeadsTab />}
-    </div>
+    </AdminMfaGate>
   );
 }
 

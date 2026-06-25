@@ -1093,6 +1093,20 @@ a[href*="emergentlabs.ai"][target="_blank"] {
 .auto-root .payment-terms__head { font-weight: 700; font-size: 13.5px; line-height: 1.3; color: #fff; }
 .auto-root .payment-terms__sub  { font-size: 12.5px; line-height: 1.4; margin-top: 2px; }
 .auto-root .payment-terms__small {
+
+/* --- Admin 2FA --- */
+.auto-root .admin-mfa-card {
+  max-width: 480px; padding: 22px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+}
+.auto-root .admin-2fa { display: flex; flex-direction: column; gap: 6px; }
+.auto-root .admin-2fa__qr {
+  display: block; width: 220px; height: 220px;
+  background: #fff; padding: 8px; border-radius: 8px;
+  margin-top: 6px;
+}
+.auto-root .admin-2fa__setup { margin-top: 14px; }
+
   font-size: 11px; padding-top: 8px; margin-top: 4px;
   border-top: 1px dashed rgba(255,255,255,0.05); line-height: 1.4;
 }

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from services.auth_service import AuthService
@@ -76,7 +76,18 @@ async def require_user(
     return user
 
 
-async def require_admin(user: Dict[str, Any] = Depends(require_user)) -> Dict[str, Any]:
+async def require_admin(
+    user: Dict[str, Any] = Depends(require_user),
+    db=Depends(get_db),
+    x_admin_mfa_token: Optional[str] = Header(default=None, alias="X-Admin-MFA-Token"),
+) -> Dict[str, Any]:
     if user.get("role") != "admin":
         raise HTTPException(403, "Требуются права администратора.")
+    # If the admin enabled 2FA, all admin requests must carry a valid
+    # X-Admin-MFA-Token issued by /auto/admin/2fa/login.
+    if user.get("auto_totp_enabled"):
+        from services.auto_admin_2fa import verify_mfa_token
+        payload = verify_mfa_token(x_admin_mfa_token) if x_admin_mfa_token else None
+        if not payload or payload.get("uid") != user["id"]:
+            raise HTTPException(401, "Требуется код двухфакторной аутентификации.")
     return user
