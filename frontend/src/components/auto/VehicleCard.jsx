@@ -81,7 +81,14 @@ export default function VehicleCard({ vehicle }) {
         <div className="vehicle-card__price-row">
           <div>
             <div className="auto-muted vehicle-card__price-label">Цена · с аукциона</div>
-            <div className="vehicle-card__price">{formatRub(vehicle.current_price_nzd)}</div>
+            <div className="vehicle-card__price" data-testid={`vehicle-price-rub-${vehicle.id}`}>
+              {formatRub(vehicle.current_price_nzd)}
+            </div>
+            {vehicle.current_price_nzd > 0 && (
+              <div className="vehicle-card__price-nzd" data-testid={`vehicle-price-nzd-${vehicle.id}`}>
+                {fmtPrice(vehicle.current_price_nzd)}
+              </div>
+            )}
           </div>
           {vehicle.auction_end_time ? (
             <div className="vehicle-card__countdown">

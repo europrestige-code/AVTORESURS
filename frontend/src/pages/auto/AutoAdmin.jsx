@@ -642,21 +642,172 @@ function CrmTab() {
 
 function ClientsTab() {
   const [items, setItems] = useState([]);
-  useEffect(() => { autoApi.get("/admin/clients").then((r) => setItems(r.data)); }, []);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [tl, setTl] = useState(null);
+  const [tlLoading, setTlLoading] = useState(false);
+
+  useEffect(() => {
+    autoApi
+      .get("/admin/clients?limit=200")
+      .then((r) => setItems(Array.isArray(r.data) ? r.data : []))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const openClient = useCallback(async (row) => {
+    setSelected(row);
+    setTl(null);
+    setTlLoading(true);
+    try {
+      const url =
+        row.kind === "user"
+          ? `/admin/clients/${row.id}/timeline`
+          : `/admin/clients/lead/${encodeURIComponent(row.phone)}/timeline`;
+      const r = await autoApi.get(url);
+      setTl(r.data);
+    } catch {
+      setTl({ client: null, events: [] });
+    } finally {
+      setTlLoading(false);
+    }
+  }, []);
+
   return (
-    <table className="auto-table" data-testid="admin-clients-table">
-      <thead><tr><th>Email</th><th>Телефон</th><th>Депозит</th><th>Зарегистрирован</th></tr></thead>
-      <tbody>
-        {items.map((u) => (
-          <tr key={u.id}>
-            <td>{u.email}</td>
-            <td>{u.phone}</td>
-            <td>{u.latest_deposit_status ? <span className="auto-badge">{u.latest_deposit_status}</span> : <span className="auto-muted">—</span>}</td>
-            <td>{u.created_at ? new Date(u.created_at).toLocaleString("ru-RU") : "—"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div data-testid="admin-clients-pane" className="crm-clients">
+      <div className="crm-clients__list">
+        <div className="crm-clients__hint auto-muted">
+          {loading ? "Загрузка…" : `Клиентов: ${items.length}`}
+        </div>
+        <table className="auto-table" data-testid="admin-clients-table">
+          <thead>
+            <tr>
+              <th>Клиент</th>
+              <th>Контакт</th>
+              <th>Активность</th>
+              <th>Депозит</th>
+              <th>Последнее событие</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((u) => (
+              <tr
+                key={`${u.kind}:${u.id}`}
+                onClick={() => openClient(u)}
+                className={selected && selected.id === u.id ? "is-selected" : ""}
+                style={{ cursor: "pointer" }}
+                data-testid={`admin-client-row-${u.id}`}
+              >
+                <td>
+                  <div style={{ fontWeight: 600 }}>{u.name || "—"}</div>
+                  <div className="auto-muted" style={{ fontSize: 11 }}>
+                    {u.kind === "user" ? "Зарегистрирован" : "Лид"} ·{" "}
+                    {u.email || "без email"}
+                  </div>
+                </td>
+                <td>{u.phone || <span className="auto-muted">—</span>}</td>
+                <td>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {u.interests > 0 && <span className="auto-badge">Интерес · {u.interests}</span>}
+                    {u.offers > 0 && <span className="auto-badge">Предлож · {u.offers}</span>}
+                    {u.bids > 0 && <span className="auto-badge auto-badge-primary">Ставок · {u.bids}</span>}
+                    {u.chat_messages > 0 && <span className="auto-badge">Чат · {u.chat_messages}</span>}
+                    {u.quiz_leads > 0 && <span className="auto-badge">Quiz · {u.quiz_leads}</span>}
+                    {u.total_events === 0 && <span className="auto-muted">—</span>}
+                  </div>
+                </td>
+                <td>
+                  {u.deposit_status ? (
+                    <span className="auto-badge">{u.deposit_status}</span>
+                  ) : (
+                    <span className="auto-muted">—</span>
+                  )}
+                </td>
+                <td>
+                  {u.last_activity
+                    ? new Date(u.last_activity).toLocaleString("ru-RU")
+                    : <span className="auto-muted">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {selected && (
+        <ClientTimelineDrawer
+          client={selected}
+          loading={tlLoading}
+          timeline={tl}
+          onClose={() => { setSelected(null); setTl(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ClientTimelineDrawer({ client, loading, timeline, onClose }) {
+  const TYPE_LABEL = {
+    interest: { label: "Интерес", color: "var(--auto-primary)" },
+    offer:    { label: "Предложение", color: "#f59e0b" },
+    bid:      { label: "Ставка", color: "#22c55e" },
+    chat:     { label: "Чат", color: "#0ea5e9" },
+    deposit:  { label: "Депозит", color: "#a855f7" },
+    quiz:     { label: "АИ-подборщик", color: "#ec4899" },
+  };
+  const events = timeline?.events || [];
+  return (
+    <div className="crm-drawer" data-testid="crm-timeline-drawer">
+      <div className="crm-drawer__head">
+        <div>
+          <div style={{ fontSize: 11, color: "var(--auto-muted)" }}>
+            {client.kind === "user" ? "Клиент" : "Лид"}
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 18 }}>
+            {client.name || client.phone || "Без имени"}
+          </div>
+          <div className="auto-muted" style={{ fontSize: 12 }}>
+            {client.email || "—"} · {client.phone || "—"}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="auto-btn auto-btn--ghost"
+          onClick={onClose}
+          data-testid="crm-timeline-close"
+        >
+          Закрыть
+        </button>
+      </div>
+      {loading && <div className="auto-muted" style={{ padding: 16 }}>Собираем таймлайн…</div>}
+      {!loading && events.length === 0 && (
+        <div className="auto-muted" style={{ padding: 16 }}>
+          Пока нет активности.
+        </div>
+      )}
+      <div className="crm-drawer__events" data-testid="crm-timeline-events">
+        {events.map((e, i) => {
+          const t = TYPE_LABEL[e.type] || { label: e.type, color: "var(--auto-muted)" };
+          return (
+            <div key={i} className="crm-event" data-testid={`crm-event-${e.type}-${i}`}>
+              <div
+                className="crm-event__pill"
+                style={{ background: t.color + "22", color: t.color }}
+              >
+                {t.label}
+              </div>
+              <div className="crm-event__body">
+                <div className="crm-event__title">{e.title}</div>
+                {e.body && <div className="crm-event__sub">{e.body}</div>}
+                <div className="crm-event__meta auto-muted">
+                  {e.at ? new Date(e.at).toLocaleString("ru-RU") : "—"}
+                  {e.vehicle_id ? ` · авто ${e.vehicle_id.slice(0, 8)}…` : ""}
+                  {e.meta?.status ? ` · ${e.meta.status}` : ""}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

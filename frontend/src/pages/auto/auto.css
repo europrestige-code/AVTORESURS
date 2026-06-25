@@ -340,6 +340,14 @@
   letter-spacing: -0.01em;
   line-height: 1.1;
 }
+.auto-root .vehicle-card__price-nzd {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ar-text-muted, rgba(255,255,255,0.55));
+  letter-spacing: 0;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
 .auto-root .vehicle-card__countdown { text-align: right; min-height: 32px; }
 .auto-root .vehicle-card__countdown--empty { visibility: hidden; }
 .auto-root .vehicle-card__cta {
@@ -754,6 +762,105 @@
   .auto-root .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 80px; height: 70vh; }
 }
 
+/* --- AI Quiz inside chat panel --- */
+.auto-root .chat-panel__body--quiz { padding: 14px; gap: 0; }
+.auto-root .chat-panel__quick--top {
+  border-top: none;
+  border-bottom: 1px solid var(--auto-border);
+  padding: 8px 14px;
+}
+.auto-root .chat-quick--quiz {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--auto-primary) 60%, transparent);
+}
+.auto-root .quiz-flow {
+  display: flex; flex-direction: column; gap: 12px;
+  color: var(--auto-text);
+}
+.auto-root .quiz-flow__header {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--auto-primary);
+}
+.auto-root .quiz-flow__loading,
+.auto-root .quiz-flow__error {
+  padding: 16px; text-align: center; color: var(--auto-muted); font-size: 13px;
+}
+.auto-root .quiz-step__title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.auto-root .quiz-step__hint { font-size: 12px; margin-top: 4px; line-height: 1.4; }
+.auto-root .quiz-step__body { margin-top: 8px; }
+.auto-root .quiz-step__error {
+  margin-top: 8px; font-size: 12px; color: var(--ar-danger, #ff6b6b);
+}
+.auto-root .quiz-step__nav {
+  display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px;
+  border-top: 1px solid var(--auto-border); padding-top: 10px;
+}
+.auto-root .quiz-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.auto-root .quiz-pill {
+  background: #161616; border: 1px solid var(--auto-border);
+  color: var(--auto-text);
+  padding: 7px 12px; border-radius: 999px; font-size: 12.5px; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.auto-root .quiz-pill:hover { border-color: color-mix(in srgb, var(--auto-primary) 70%, transparent); }
+.auto-root .quiz-pill.is-active {
+  background: color-mix(in srgb, var(--auto-primary) 18%, transparent);
+  border-color: var(--auto-primary);
+  color: #fff;
+}
+.auto-root .quiz-group-label {
+  font-size: 11px; text-transform: uppercase; color: var(--auto-muted);
+  letter-spacing: 0.06em; margin: 12px 0 6px;
+}
+.auto-root .quiz-fields { display: flex; flex-direction: column; gap: 10px; }
+.auto-root .quiz-field {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--auto-muted);
+}
+.auto-root .quiz-field .auto-input { width: 100%; }
+.auto-root .quiz-flow__title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.auto-root .quiz-flow__sub { font-size: 12px; line-height: 1.4; }
+.auto-root .quiz-flow__matches { display: flex; flex-direction: column; gap: 8px; }
+.auto-root .quiz-flow__empty {
+  padding: 12px; border: 1px dashed var(--auto-border); border-radius: 12px;
+  font-size: 12px; text-align: center;
+}
+.auto-root .quiz-match {
+  display: flex; gap: 10px;
+  padding: 8px; border: 1px solid var(--auto-border); border-radius: 12px;
+  background: #131313;
+  text-decoration: none; color: inherit;
+  transition: border-color .15s, transform .15s;
+}
+.auto-root .quiz-match:hover {
+  border-color: var(--auto-primary);
+  transform: translateY(-1px);
+}
+.auto-root .quiz-match__media {
+  width: 76px; height: 60px; border-radius: 8px; overflow: hidden;
+  background: #0a0a0a; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.auto-root .quiz-match__media img { width: 100%; height: 100%; object-fit: cover; }
+.auto-root .quiz-match__placeholder { font-size: 10px; color: var(--auto-muted); padding: 4px; text-align: center; }
+.auto-root .quiz-match__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.auto-root .quiz-match__title {
+  font-size: 13px; font-weight: 700; color: #fff;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.auto-root .quiz-match__meta { font-size: 11px; }
+.auto-root .quiz-match__price {
+  font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--auto-primary);
+}
+.auto-root .quiz-flow__close { width: 100%; margin-top: 4px; }
+
+
 /* --- Landed Price Modal --- */
 .landed-modal__backdrop {
   position: fixed; inset: 0; z-index: 10000;
@@ -844,3 +951,57 @@ a[href*="emergentlabs.ai"][target="_blank"] {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+
+/* --- Admin CRM clients + timeline drawer --- */
+.auto-root .crm-clients {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 16px;
+  align-items: flex-start;
+}
+@media (max-width: 1100px) {
+  .auto-root .crm-clients { grid-template-columns: 1fr; }
+}
+.auto-root .crm-clients__hint { font-size: 12px; margin-bottom: 8px; }
+.auto-root .crm-clients__list table tr.is-selected {
+  background: rgba(58, 134, 255, 0.10);
+}
+.auto-root .crm-clients__list table tr:hover {
+  background: rgba(255,255,255,0.02);
+}
+.auto-root .crm-drawer {
+  position: sticky; top: 16px;
+  background: #0d0d0d;
+  border: 1px solid var(--auto-border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+.auto-root .crm-drawer__head {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--auto-border);
+}
+.auto-root .crm-drawer__events {
+  display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto; padding-right: 4px;
+}
+.auto-root .crm-event {
+  display: grid; grid-template-columns: 120px 1fr; gap: 12px;
+  padding: 10px 0; border-bottom: 1px dashed rgba(255,255,255,0.05);
+}
+.auto-root .crm-event:last-child { border-bottom: none; }
+.auto-root .crm-event__pill {
+  height: max-content;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+  text-align: center;
+}
+.auto-root .crm-event__title { font-weight: 600; line-height: 1.3; }
+.auto-root .crm-event__sub {
+  font-size: 12.5px; color: var(--auto-text); margin-top: 4px;
+  white-space: pre-wrap; word-wrap: break-word;
+}
+.auto-root .crm-event__meta { font-size: 11px; margin-top: 4px; }
+

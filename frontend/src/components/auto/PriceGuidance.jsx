@@ -1,16 +1,10 @@
 import React from "react";
-import { formatRub, fmtRubAmount, rubWithNzd } from "../../services/autoCurrency";
-import { fmtPrice } from "./VehicleCard";
+import { fmtRubAmount, formatRub } from "../../services/autoCurrency";
 
 /* Price guidance block — three transparent values + disclaimer.
  *
- * The spec wants users to see:
- *   - Оценка аукциона (estimate from)         — fallback bands when no auction price
- *   - Рекомендуемая ставка (low–high range)  — derived from the current/estimated price
- *   - Ориентир под ключ (in RUB)             — from price_breakdown if available, otherwise computed
- *
- * Everything is presented as an *estimate* with a clear disclaimer so we
- * never imply a binding price.
+ * Per the brand rule "everything in roubles", each row shows the RUB amount
+ * as the primary value and the original NZD amount in a smaller line below.
  */
 export default function PriceGuidance({ vehicle }) {
   const ai = vehicle.ai_estimate || null;
@@ -57,31 +51,40 @@ export default function PriceGuidance({ vehicle }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Row
           label="Оценка аукциона ИИ"
-          value={
+          rub={
             estimateLow && estimateHigh
-              ? `${fmtPrice(estimateLow)} – ${fmtPrice(estimateHigh)}`
+              ? `${formatRub(estimateLow)} – ${formatRub(estimateHigh)}`
               : estimateLow
-                ? `от ${fmtPrice(estimateLow)}`
-                : "—"
+                ? `от ${formatRub(estimateLow)}`
+                : null
+          }
+          nzd={
+            estimateLow && estimateHigh
+              ? `NZ$${fmtNz(estimateLow)} – NZ$${fmtNz(estimateHigh)}`
+              : estimateLow
+                ? `от NZ$${fmtNz(estimateLow)}`
+                : null
           }
           hint={ai ? `${ai.based_on_observations || 0} наблюдений · ${ai.model || "AI"}` : "по данным источника"}
           testid="pg-estimate"
         />
         <Row
           label="Рекомендуемая ставка"
-          value={recLow && recHigh ? `${fmtPrice(recLow)} – ${fmtPrice(recHigh)}` : "—"}
+          rub={recLow && recHigh ? `${formatRub(recLow)} – ${formatRub(recHigh)}` : null}
+          nzd={recLow && recHigh ? `NZ$${fmtNz(recLow)} – NZ$${fmtNz(recHigh)}` : null}
           hint="макс. цена выигрыша"
           testid="pg-recommended"
         />
         <Row
           label="Ориентир под ключ"
-          value={
+          rub={
             landedRub
               ? `от ${fmtRubAmount(landedRub)}`
               : cur
                 ? `от ${formatRub(cur)}`
-                : "—"
+                : null
           }
+          nzd={cur ? `от NZ$${fmtNz(cur)}` : null}
           hint="до Владивостока"
           testid="pg-landed"
         />
@@ -109,12 +112,21 @@ export default function PriceGuidance({ vehicle }) {
   );
 }
 
-function Row({ label, value, hint, testid }) {
+function fmtNz(v) {
+  return Number(v).toLocaleString("en-NZ", { maximumFractionDigits: 0 });
+}
+
+function Row({ label, rub, nzd, hint, testid }) {
   return (
     <div data-testid={testid}>
       <div className="text-[11px] uppercase tracking-wide text-gray-400">{label}</div>
-      <div className="mt-1 font-mono text-base font-bold text-white">{value}</div>
-      {hint && <div className="text-[11px] text-gray-500">{hint}</div>}
+      <div className="mt-1 font-mono text-[15px] font-bold leading-tight text-white">
+        {rub || "—"}
+      </div>
+      {nzd && (
+        <div className="mt-0.5 font-mono text-[11px] text-gray-500">{nzd}</div>
+      )}
+      {hint && <div className="mt-0.5 text-[11px] text-gray-500">{hint}</div>}
     </div>
   );
 }

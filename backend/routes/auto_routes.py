@@ -613,7 +613,36 @@ async def chat(
     return result
 
 
-# ----- Image branding backfill -----
+# ----- AI Подборщик (quiz) -----
+
+@router.get("/quiz/meta")
+async def quiz_meta():
+    """Static taxonomy used by the quiz wizard in the chat widget."""
+    from services.auto_quiz_service import get_quiz_meta
+    return get_quiz_meta()
+
+
+@router.post("/quiz/submit")
+async def quiz_submit(
+    payload: Dict[str, Any] = Body(...),
+    user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+    db=Depends(get_db),
+):
+    """Accept a completed quiz, store it as a lead, and return matches."""
+    from services.auto_fx_service import get_fx_rate
+    from services.auto_quiz_service import AutoQuizService
+    fx = await get_fx_rate()
+    fx_rate = float(fx.get("nzd_to_rub_display") or fx.get("nzd_to_rub_spot") or 57.68)
+    svc = AutoQuizService(db)
+    try:
+        result = await svc.submit(
+            payload,
+            fx_rate=fx_rate,
+            user_id=user.get("id") if user else None,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return result
 
 @router.post("/admin/images/backfill-branding")
 async def admin_backfill_branding(
@@ -1601,18 +1630,42 @@ async def admin_add_logistics_event(
 
 @router.get("/admin/clients")
 async def admin_list_clients(
+    limit: int = 200,
     _: Dict[str, Any] = Depends(require_admin),
     db=Depends(get_db),
 ):
-    items: List[Dict[str, Any]] = []
-    async for u in db.users.find({"role": "customer"}).sort("created_at", -1):
-        u.pop("_id", None)
-        u.pop("password_hash", None)
-        # latest deposit status
-        d = await db.auto_deposits.find_one({"user_id": u["id"]}, sort=[("created_at", -1)])
-        u["latest_deposit_status"] = (d or {}).get("status")
-        items.append(u)
-    return items
+    """Deep CRM client list with merged activity counts (interests, offers,
+    bids, chat sessions, quiz leads) and a `last_activity` timestamp so the
+    panel can be sorted by recency."""
+    from services.auto_crm_timeline import AutoCrmTimelineService
+    return await AutoCrmTimelineService(db).list_clients(limit=limit)
+
+
+@router.get("/admin/clients/{user_id}/timeline")
+async def admin_client_timeline(
+    user_id: str,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Return a single merged chronological timeline (all stages, all
+    interactions) for one registered client."""
+    from services.auto_crm_timeline import AutoCrmTimelineService
+    res = await AutoCrmTimelineService(db).timeline_for_user(user_id)
+    if not res.get("client"):
+        raise HTTPException(404, "Клиент не найден.")
+    return res
+
+
+@router.get("/admin/clients/lead/{phone}/timeline")
+async def admin_lead_timeline(
+    phone: str,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Timeline for an anonymous lead (no registered account) — keyed by
+    phone number. Sales uses this to follow up before the lead converts."""
+    from services.auto_crm_timeline import AutoCrmTimelineService
+    return await AutoCrmTimelineService(db).timeline_by_phone(phone)
 
 
 @router.post("/admin/vehicles/{vehicle_id}/mark-won")

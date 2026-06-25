@@ -1,0 +1,26 @@
+{
+  "summary": "Iter10 — verified (a) RUB primary / NZD secondary price display, (b) АИ-подборщик 5-step quiz inside Татьяна chat widget, (c) Deep CRM timeline in admin, plus backend regression on /api/auto/vehicles. BACKEND 11/11 pytest GREEN. FRONTEND all three flows verified end-to-end on the production preview URL.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter10_quiz_crm.py",
+    "/app/test_reports/pytest/iter10.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "auto_crm_timeline.list_clients runs 5 separate aggregates ($fold_counts ×5) per request — fine at current 9 clients but will need a single $unionWith or cached materialised view once clients > ~5k.",
+    "auto_quiz_service.submit silently swallows all exceptions in the AutoInterestCreate mirror (best-effort). Recommend a logger.warning so a broken CRM bridge doesn't go unnoticed in prod.",
+    "auto_quiz_service._match builds $or for budget then re-wraps into $and when body_types present — works but the query is hard to read; extract a helper or use $expr to avoid future regressions.",
+    "auto_routes.py still ~1837 lines (carry-over from iter8/9). Refactor into sub-routers (quiz/crm/intel/email) post-MVP."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter10_quiz_crm.py (NEW — 11 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (11/11 pytest)", "frontend": "100%"},
+  "test_credentials": "admin@buyanywhere.com / admin12345; client@buyanywhere.com / client12345",
+  "seed_data_creation": "Quiz leads inserted via tests: +79991117710 (TEST_quiz_iter10), +79991117711 (TEST_quiz_match), +79991117790 (TEST_iter10_ui via Playwright). Each row also mirrored into auto_interests (source='quiz'). All TEST_-prefixed names use +7999111… range — easy to clean up.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter10 GREEN for the 3 features under review: PriceGuidance widget shows '957 373 ₽ – 1 218 474 ₽' (primary) with 'NZ$22,000 – NZ$28,000' on a separate smaller line — verified on /auto/vehicle/1f49c4c5-4f6a-44d8-a1fa-d6ff43579a88. VehicleCard on /auto/catalog?country=AU shows '1 066 165 ₽' primary + 'NZ$24,500' secondary. ChatWidget on /auto has FAB 'Спросить Татьяну' → chat-quiz-cta 'Подобрать авто за 60 секунд' → quiz-flow with 5 steps (purpose pills → body-type → budget pill → country+urgency → name/contact/city/notes). 'Далее' (quiz-next-btn) disables until required selection. Submitting renders quiz-result with quiz-match-* cards linking /auto/vehicle/{id}. /auto/admin → tab Клиенты shows 9 client rows (admin-client-row-*) mixing kind=user (with email) and kind=lead (with phone). Clicking opens crm-timeline-drawer with event pills: Интерес, АИ-подборщик, plus Ставка/Предлож/Чат/Депозит where present. Auth: /api/auth/login returns access_token; inject into localStorage['access_token'] then navigate to /auto/admin. Backend endpoints verified: GET /api/auto/quiz/meta, POST /api/auto/quiz/submit (200 happy path, 400 on empty name/contact), GET /api/auto/admin/clients (200 with kind/interests/offers/bids/chat_messages/quiz_leads/last_activity/total_events fields and BOTH user+lead kinds present), GET /api/auto/admin/clients/{uid}/timeline (200 with merged events sorted desc, 404 for unknown id), GET /api/auto/admin/clients/lead/{phone}/timeline (200 for lead). Regression: GET /api/auto/vehicles still 200. auto_routes.py refactor was NOT tested per request.",
+  "rca of the issue": "N/A — all features pass without code changes."
+}
