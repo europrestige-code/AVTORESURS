@@ -26,7 +26,7 @@ export default function PriceGuidance({ vehicle }) {
 
   return (
     <div
-      className="mb-3 rounded-2xl border border-white/10 bg-[#0D111A] p-5"
+      className="mb-3 rounded-2xl border border-white/10 bg-[var(--ar-card)] p-5"
       data-testid="price-guidance"
     >
       <div className="mb-3 flex items-center justify-between gap-2">

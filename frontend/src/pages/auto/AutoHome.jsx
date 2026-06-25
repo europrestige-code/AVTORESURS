@@ -215,7 +215,7 @@ export default function AutoHome() {
   }, []);
 
   return (
-    <main className="auto-home-v2 -mx-4 lg:-mx-6 bg-[#05070B] text-white" data-testid="auto-home">
+    <main className="auto-home-v2 -mx-4 lg:-mx-6 bg-[var(--ar-black)] text-white" data-testid="auto-home">
       <Hero onView={() => navigate("/auto/catalog")} />
       <SearchPanel total={totals.total} onSubmit={() => navigate("/auto/catalog")} />
 
@@ -254,7 +254,7 @@ function Hero({ onView }) {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle at 70% 35%, rgba(0,102,255,0.35), transparent 45%), linear-gradient(180deg, #060A14 0%, #05070B 100%)",
+            "radial-gradient(circle at 70% 35%, rgba(0,102,255,0.35), transparent 45%), linear-gradient(180deg, #060A14 0%, var(--ar-black) 100%)",
         }}
       />
       {/* network/world map overlay */}
@@ -272,7 +272,7 @@ function Hero({ onView }) {
         style={{ backgroundImage: `url('${HERO_IMG}')` }}
       />
       {/* fade-from-left so text stays readable */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#05070B] via-[#05070B]/85 to-[#05070B]/10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[var(--ar-black)] via-[var(--ar-black)]/85 to-[var(--ar-black)]/10" />
 
       <div className="relative mx-auto max-w-7xl px-6 py-24 lg:py-32">
         <div className="max-w-2xl">
@@ -354,7 +354,7 @@ function SearchPanel({ total, onSubmit }) {
   return (
     <section className="mx-auto -mt-12 max-w-7xl px-6">
       <div
-        className="relative z-10 rounded-3xl border border-white/10 bg-[#0D111A]/85 p-5 shadow-[0_28px_60px_-20px_rgba(0,102,255,0.25)] backdrop-blur-xl md:p-6"
+        className="relative z-10 rounded-3xl border border-white/10 bg-[var(--ar-card)]/85 p-5 shadow-[0_28px_60px_-20px_rgba(0,102,255,0.25)] backdrop-blur-xl md:p-6"
         data-testid="search-panel"
       >
         <div className="mb-4 flex flex-wrap gap-2">
@@ -470,7 +470,7 @@ function SelectStatic({ label, value }) {
 function UpcomingAuctions({ auctions, now }) {
   return (
     <div
-      className="rounded-2xl border border-white/10 bg-[#0D111A] p-5 lg:col-span-2"
+      className="rounded-2xl border border-white/10 bg-[var(--ar-card)] p-5 lg:col-span-2"
       data-testid="upcoming-auctions"
     >
       <div className="mb-5 flex items-center justify-between">
@@ -521,7 +521,7 @@ function AuctionCard({ a, now, i }) {
 
       <div className="p-4">
         <div className="flex items-center gap-1.5 text-lg font-bold leading-tight">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0066ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ar-blue)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
             <circle cx="12" cy="10" r="3"/>
           </svg>
@@ -546,7 +546,7 @@ function AuctionCard({ a, now, i }) {
  * ========================================================================== */
 function WhyUs() {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0D111A] p-5" data-testid="why-us">
+    <div className="rounded-2xl border border-white/10 bg-[var(--ar-card)] p-5" data-testid="why-us">
       <h2 className="mb-5 text-2xl font-bold">Почему выбирают нас</h2>
       <div className="grid grid-cols-2 gap-4">
         {STATS.map(({ icon: Icon, number, text }) => (
@@ -573,7 +573,7 @@ function PopularCategories() {
           <Link
             key={c.key}
             to={c.to}
-            className="group block overflow-hidden rounded-2xl border border-white/10 bg-[#0D111A] transition hover:-translate-y-0.5 hover:border-blue-500/50"
+            className="group block overflow-hidden rounded-2xl border border-white/10 bg-[var(--ar-card)] transition hover:-translate-y-0.5 hover:border-blue-500/50"
             data-testid={`category-${c.key}`}
           >
             <div className="p-4">
@@ -589,7 +589,7 @@ function PopularCategories() {
                 loading="lazy"
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0D111A] via-[#0D111A]/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--ar-card)] via-[var(--ar-card)]/40 to-transparent" />
             </div>
           </Link>
         ))}
@@ -605,14 +605,14 @@ function LeadCapture() {
   return (
     <div
       className="relative overflow-hidden rounded-2xl border border-white/10 p-6"
-      style={{ background: "linear-gradient(135deg, #0D111A 0%, rgba(6,44,117,0.5) 100%)" }}
+      style={{ background: "linear-gradient(135deg, var(--ar-card) 0%, rgba(6,44,117,0.5) 100%)" }}
       data-testid="lead-capture"
     >
       <div
         className="absolute right-0 top-0 h-full w-2/5 bg-cover bg-right opacity-30"
         style={{ backgroundImage: `url('${LEAD_CAR_SILHOUETTE}')` }}
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0D111A] via-[#0D111A]/70 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[var(--ar-card)] via-[var(--ar-card)]/70 to-transparent" />
       <div className="relative">
         <h2 className="text-2xl font-bold leading-tight">Хотите найти конкретный автомобиль?</h2>
         <p className="mt-3 max-w-md text-gray-300">
@@ -638,7 +638,7 @@ function BottomStrip() {
   return (
     <section className="mx-auto grid max-w-7xl gap-4 px-6 pb-12 md:grid-cols-2 lg:grid-cols-4" data-testid="bottom-features">
       {BOTTOM_FEATURES.map(({ icon: Icon, title, text }) => (
-        <div key={title} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#0D111A] p-4">
+        <div key={title} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[var(--ar-card)] p-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 ring-1 ring-blue-500/20">
             <Icon className="h-6 w-6 text-blue-400" />
           </div>
@@ -698,7 +698,7 @@ function HotDaily() {
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="h-72 animate-pulse rounded-2xl border border-white/10 bg-[#0D111A]" />
+            <div key={i} className="h-72 animate-pulse rounded-2xl border border-white/10 bg-[var(--ar-card)]" />
           ))}
         </div>
       ) : (
@@ -718,7 +718,7 @@ function HotCard({ v }) {
   return (
     <Link
       to={`/auto/vehicle/${v.id}`}
-      className="group block overflow-hidden rounded-2xl border border-white/10 bg-[#0D111A] transition hover:-translate-y-0.5 hover:border-blue-500/60"
+      className="group block overflow-hidden rounded-2xl border border-white/10 bg-[var(--ar-card)] transition hover:-translate-y-0.5 hover:border-blue-500/60"
       data-testid={`hot-card-${v.id}`}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden">
@@ -730,7 +730,7 @@ function HotCard({ v }) {
             className="flex h-full w-full items-center justify-center"
             style={{
               background:
-                "radial-gradient(circle at 30% 30%, rgba(0,102,255,0.35), transparent 60%), linear-gradient(135deg, #0B1424 0%, #05070B 100%)",
+                "radial-gradient(circle at 30% 30%, rgba(0,102,255,0.35), transparent 60%), linear-gradient(135deg, #0B1424 0%, var(--ar-black) 100%)",
             }}
           >
             <span className="font-black text-blue-500/70 text-5xl tracking-tight">{initials}</span>

@@ -161,6 +161,9 @@ function App() {
                 <Route path="damaged" element={<CategoryPage category={CATEGORY_DEFS.damaged} />} />
                 <Route path="end-of-life" element={<CategoryPage category={CATEGORY_DEFS.eol} />} />
                 <Route path="parts" element={<CategoryPage category={CATEGORY_DEFS.parts} />} />
+                <Route path="motorcycles" element={<CategoryPage category={CATEGORY_DEFS.motorcycles} />} />
+                <Route path="trucks" element={<CategoryPage category={CATEGORY_DEFS.trucks} />} />
+                <Route path="machinery" element={<CategoryPage category={CATEGORY_DEFS.machinery} />} />
               </Route>
 
               {/* Regular app routes */}

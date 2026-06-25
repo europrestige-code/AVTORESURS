@@ -105,7 +105,7 @@ function EndingCard({ v, now }) {
         )}
         <span
           className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${
-            lessThanDay ? "bg-[#FF3B30] text-white" : "bg-black/65 text-white"
+            lessThanDay ? "bg-[var(--ar-danger)] text-white" : "bg-black/65 text-white"
           }`}
         >
           <Clock size={10} />

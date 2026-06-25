@@ -74,7 +74,7 @@ export default function LeadModal({
       data-testid="lead-modal-backdrop"
     >
       <div
-        className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0D111A] p-6 shadow-2xl"
+        className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[var(--ar-card)] p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         data-testid="lead-modal"
       >
@@ -88,7 +88,7 @@ export default function LeadModal({
         </button>
         {done ? (
           <div className="py-6 text-center" data-testid="lead-modal-success">
-            <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#00C853]/20 text-3xl">
+            <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[var(--ar-success)]/20 text-3xl">
               ✓
             </div>
             <h3 className="text-xl font-bold text-white">Заявка отправлена</h3>
@@ -176,7 +176,7 @@ export default function LeadModal({
             </Field>
 
             {error && (
-              <div className="rounded-lg bg-[#FF3B30]/15 px-3 py-2 text-sm text-[#FF7A6F]" data-testid="lead-error">
+              <div className="rounded-lg bg-[var(--ar-danger)]/15 px-3 py-2 text-sm text-[#FF7A6F]" data-testid="lead-error">
                 {error}
               </div>
             )}
@@ -214,7 +214,7 @@ export default function LeadModal({
             font-size: 14px;
             color: #fff;
           }
-          .input:focus { outline: none; border-color: #0066ff; box-shadow: 0 0 0 2px rgba(0,102,255,0.2); }
+          .input:focus { outline: none; border-color: var(--ar-blue); box-shadow: 0 0 0 2px rgba(0,102,255,0.2); }
         `}</style>
       </div>
     </div>

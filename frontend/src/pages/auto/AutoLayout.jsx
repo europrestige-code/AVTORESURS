@@ -21,16 +21,16 @@ const NAV = [
 export default function AutoLayout() {
   const { isAuthenticated, user, logout } = useAuth();
   return (
-    <div className="auto-root min-h-screen bg-[#05070B] text-white" data-testid="auto-root">
+    <div className="auto-root min-h-screen bg-[var(--ar-black)] text-white" data-testid="auto-root">
       {/* Top contact bar */}
-      <div className="border-b border-white/5 bg-[#05070B]">
+      <div className="border-b border-white/5 bg-[var(--ar-black)]">
         <div className="mx-auto flex max-w-7xl items-center justify-end gap-4 px-6 py-1.5 text-xs">
           <ContactsBar variant="header" />
         </div>
       </div>
 
       {/* Sticky main header */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#05070B]/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--ar-black)]/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-screen-2xl items-end justify-between gap-6 px-6 py-4">
           <NavLink to="/auto" end className="flex items-center" data-testid="auto-brand">
             <img

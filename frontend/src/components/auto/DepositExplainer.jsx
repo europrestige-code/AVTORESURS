@@ -21,7 +21,7 @@ export default function DepositExplainer({ compact = false }) {
 
   return (
     <section
-      className="mx-auto my-10 max-w-7xl rounded-2xl border border-white/10 bg-[#0D111A] p-6"
+      className="mx-auto my-10 max-w-7xl rounded-2xl border border-white/10 bg-[var(--ar-card)] p-6"
       data-testid="deposit-explainer"
     >
       <div className="grid items-start gap-6 md:grid-cols-[1.2fr_1fr]">
@@ -34,7 +34,7 @@ export default function DepositExplainer({ compact = false }) {
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Card
-              icon={<ShieldCheck size={20} className="text-[#00C853]" />}
+              icon={<ShieldCheck size={20} className="text-[var(--ar-success)]" />}
               title="Безопасно"
               text="Платёж через Stripe (PCI DSS). Карта или банковский перевод."
             />

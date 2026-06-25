@@ -73,6 +73,30 @@ BODY_TYPES: List[Dict[str, Any]] = [
         "aliases": ["suv", "4wd", "4x4", "crossover", "off-road", "offroad",
                     "внедорожник", "кроссовер", "джип"],
     },
+    {
+        "key": "motorcycle",
+        "label_ru": "Мотоцикл",
+        "label_en": "Motorcycle",
+        "aliases": ["motorcycle", "motorbike", "motor bike", "bike", "scooter",
+                    "moped", "atv", "quad", "trike",
+                    "мотоцикл", "скутер", "квадроцикл"],
+    },
+    {
+        "key": "truck",
+        "label_ru": "Грузовик",
+        "label_en": "Truck",
+        "aliases": ["truck", "lorry", "freight", "heavy commercial",
+                    "грузовик", "грузовой", "тягач"],
+    },
+    {
+        "key": "machinery",
+        "label_ru": "Спецтехника",
+        "label_en": "Heavy Machinery",
+        "aliases": ["excavator", "forklift", "loader", "bulldozer", "crane",
+                    "tractor", "digger", "backhoe", "skid steer", "machinery",
+                    "спецтехника", "экскаватор", "погрузчик", "трактор",
+                    "бульдозер", "кран"],
+    },
 ]
 
 

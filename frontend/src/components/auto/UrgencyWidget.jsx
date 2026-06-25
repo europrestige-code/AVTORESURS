@@ -59,13 +59,13 @@ export default function UrgencyWidget({ vehicle }) {
 
   return (
     <div
-      className="mb-3 rounded-2xl border border-white/10 bg-[#0D111A] p-4"
+      className="mb-3 rounded-2xl border border-white/10 bg-[var(--ar-card)] p-4"
       data-testid="urgency-widget"
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {isAuction && (
           <Stat
-            icon={<Clock size={16} className={endingSoon ? "text-[#FF9800]" : "text-blue-400"} />}
+            icon={<Clock size={16} className={endingSoon ? "text-[var(--ar-warning)]" : "text-blue-400"} />}
             label="До окончания"
             value={remaining || "—"}
             tone={endingSoon ? "warning" : "default"}
@@ -93,7 +93,7 @@ export default function UrgencyWidget({ vehicle }) {
       </div>
       {endingSoon && isAuction && (
         <div
-          className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#FF9800]/15 px-3 py-1 text-[12px] font-bold text-[#FFB84D]"
+          className="mt-3 inline-flex items-center gap-2 rounded-full bg-[var(--ar-warning)]/15 px-3 py-1 text-[12px] font-bold text-[#FFB84D]"
           data-testid="urgency-ending-soon"
         >
           <Clock size={12} />

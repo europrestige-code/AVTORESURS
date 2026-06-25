@@ -1,19 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import autoApi from "../../services/autoApi";
-import { Car, CreditCard, Wrench, Recycle, CalendarDays, Cog, Bike } from "lucide-react";
-
-const BODY_TYPE_LABEL = {
-  Кабриолет: "Кабриолет",
-  Универсал: "Универсал",
-  Пикап: "Пикап",
-  Купе: "Купе",
-  Хэтчбек: "Хэтчбек",
-  Фургон: "Фургон",
-  Седан: "Седан",
-  Кроссовер: "Кроссовер",
-  Внедорожник: "Внедорожник",
-};
+import { Car, CreditCard, Wrench, Recycle, CalendarDays, Cog, Bike, Truck, Tractor } from "lucide-react";
+import BodyTypeStrip from "./BodyTypeStrip";
 
 const CATEGORIES = [
   { key: "auctions", label: "Аукционы",      route: "/auto/auctions-list", Icon: Car },
@@ -21,14 +10,16 @@ const CATEGORIES = [
   { key: "damaged",  label: "Повреждённые",  route: "/auto/damaged",       Icon: Wrench },
   { key: "eol",      label: "End of Life",   route: "/auto/end-of-life",   Icon: Recycle },
   { key: "calendar", label: "Календарь",     route: "/auto/auctions",      Icon: CalendarDays },
+  { key: "moto",     label: "Мотоциклы",     route: "/auto/motorcycles",   Icon: Bike },
+  { key: "trucks",   label: "Грузовики",     route: "/auto/trucks",        Icon: Truck },
+  { key: "machinery",label: "Спецтехника",   route: "/auto/machinery",     Icon: Tractor },
   { key: "parts",    label: "Запчасти",      route: "/auto/parts",         Icon: Cog,  soon: true },
-  { key: "moto",     label: "Мотоциклы",                                   Icon: Bike, soon: true },
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 35 }, (_, i) => CURRENT_YEAR - i);
 
-export default function SearchHero({ variant = "home" }) {
+export default function SearchHero({ variant = "home", activeBodyType = null }) {
   const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
   const [make, setMake] = useState("");
@@ -40,8 +31,6 @@ export default function SearchHero({ variant = "home" }) {
     autoApi.get("/catalog-summary").then((r) => setSummary(r.data)).catch(() => setSummary(null));
   }, []);
 
-  const total = summary?.total ?? 0;
-  const bodyTypes = useMemo(() => summary?.body_types || [], [summary]);
   const makes = useMemo(() => summary?.makes || [], [summary]);
   const modelsForMake = useMemo(() => {
     if (!make || !summary) return [];
@@ -60,37 +49,13 @@ export default function SearchHero({ variant = "home" }) {
 
   return (
     <section className={`auto-card auto-search-hero ${variant === "catalog" ? "compact" : ""}`} data-testid="search-hero">
-      <div className="auto-search-hero__title">
-        <h2 style={{ fontSize: variant === "home" ? 28 : 22, margin: 0, fontWeight: 800, letterSpacing: "-0.01em" }}>
-          Найдите авто среди{" "}
-          <span style={{ color: "var(--auto-primary)" }} data-testid="search-hero-total">
-            {total.toLocaleString("ru-RU")}
-          </span>{" "}
-          в наличии
-        </h2>
-        <p className="auto-muted" style={{ marginTop: 6 }}>
-          Помощник <b style={{ color: "var(--auto-text)" }}>Тина</b> подберёт автомобиль из Turners, Manheim и Pickles.
-        </p>
-      </div>
-
-      {/* Body-type chips */}
-      <div className="auto-search-hero__chips" data-testid="search-body-chips">
-        {bodyTypes.length === 0 ? (
-          <span className="auto-muted" style={{ fontSize: 13 }}>Загружаем категории…</span>
-        ) : (
-          bodyTypes.map((b) => (
-            <button
-              key={b.value}
-              type="button"
-              className="auto-badge auto-badge-primary auto-chip"
-              onClick={() => goWith({ body_type: b.value })}
-              data-testid={`search-chip-${b.value}`}
-            >
-              {BODY_TYPE_LABEL[b.value] || b.value} <span style={{ opacity: 0.7 }}>({b.count})</span>
-            </button>
-          ))
-        )}
-      </div>
+      {/* Body-type filter strip — single source of truth. Replaces the
+       *  previous in-hero chips (was duplicated with BodyTypeStrip). */}
+      <BodyTypeStrip
+        activeKey={activeBodyType}
+        onSelect={(key) => goWith({ body_type: key })}
+        className="mb-4"
+      />
 
       {/* Make / Model / Year selectors */}
       <div className="auto-search-hero__row">

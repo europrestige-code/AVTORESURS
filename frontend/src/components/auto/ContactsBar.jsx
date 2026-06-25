@@ -52,7 +52,7 @@ function Item({ icon: Icon, label, value, href, accent }) {
   const text = label ? `${label}: ${value}` : value;
   const inner = (
     <div className="flex items-center gap-2">
-      <Icon size={14} style={accent ? { color: accent } : { color: "#3385FF" }} />
+      <Icon size={14} style={accent ? { color: accent } : { color: "var(--ar-blue-hover)" }} />
       <span>{text}</span>
     </div>
   );

@@ -30,7 +30,7 @@ export default function SimilarLots({ vehicleId }) {
 
   return (
     <section
-      className="mt-8 rounded-2xl border border-white/10 bg-[#0D111A] p-5"
+      className="mt-8 rounded-2xl border border-white/10 bg-[var(--ar-card)] p-5"
       data-testid="similar-lots"
     >
       <div className="mb-4 flex items-end justify-between gap-3">
@@ -93,7 +93,7 @@ function SimilarCard({ v }) {
             className="flex h-full w-full items-center justify-center"
             style={{
               background:
-                "radial-gradient(circle at 30% 30%, rgba(0,102,255,0.35), transparent 60%), linear-gradient(135deg, #0B1424 0%, #05070B 100%)",
+                "radial-gradient(circle at 30% 30%, rgba(0,102,255,0.35), transparent 60%), linear-gradient(135deg, #0B1424 0%, var(--ar-black) 100%)",
             }}
           >
             <span className="font-black text-blue-500/70 text-3xl tracking-tight">

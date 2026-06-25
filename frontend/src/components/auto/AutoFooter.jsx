@@ -36,7 +36,7 @@ const NAV_COLS = [
 
 export default function AutoFooter() {
   return (
-    <footer className="mt-16 border-t border-white/10 bg-[#05070B]" data-testid="auto-footer">
+    <footer className="mt-16 border-t border-white/10 bg-[var(--ar-black)]" data-testid="auto-footer">
       <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-5">
         {/* Brand + contacts */}
         <div className="lg:col-span-2">

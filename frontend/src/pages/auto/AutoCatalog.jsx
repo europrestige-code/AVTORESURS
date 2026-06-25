@@ -4,7 +4,6 @@ import autoApi from "../../services/autoApi";
 import VehicleCard from "../../components/auto/VehicleCard";
 import VehicleFilters from "../../components/auto/VehicleFilters";
 import SearchHero from "../../components/auto/SearchHero";
-import BodyTypeStrip from "../../components/auto/BodyTypeStrip";
 
 const LIMIT = 12;
 
@@ -64,25 +63,9 @@ export default function AutoCatalog() {
 
   return (
     <div className="auto-section">
-      <SearchHero variant="catalog" />
-      <BodyTypeStrip
-        activeKey={filters.body_type || null}
-        onSelect={(key) => {
-          setOffset(0);
-          const next = { ...filters };
-          if (next.body_type === key) {
-            delete next.body_type;
-          } else {
-            next.body_type = key;
-          }
-          setFilters(next);
-          // Sync URL so the user can share the link
-          const params = new URLSearchParams(searchParams);
-          if (next.body_type) params.set("body_type", next.body_type);
-          else params.delete("body_type");
-          setSearchParams(params, { replace: true });
-        }}
-        className="mt-3"
+      <SearchHero
+        variant="catalog"
+        activeBodyType={filters.body_type || null}
       />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", margin: "18px 0 12px" }}>
         <div>

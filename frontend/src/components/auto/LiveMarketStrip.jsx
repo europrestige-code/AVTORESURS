@@ -33,7 +33,7 @@ export default function LiveMarketStrip() {
 
   return (
     <section
-      className="mx-auto mt-6 max-w-7xl rounded-2xl border border-white/10 bg-[#0D111A] p-3 sm:p-4"
+      className="mx-auto mt-6 max-w-7xl rounded-2xl border border-white/10 bg-[var(--ar-card)] p-3 sm:p-4"
       data-testid="live-market-strip"
     >
       <div className="flex gap-3 overflow-x-auto sm:grid sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">

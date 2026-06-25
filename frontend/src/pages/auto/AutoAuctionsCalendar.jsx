@@ -15,7 +15,7 @@ function CityTag({ name, testid }) {
       className="inline-flex items-center gap-1 whitespace-nowrap"
       title="Место проведения аукциона (Новая Зеландия)"
     >
-      <MapPin size={13} style={{ color: "var(--ar-blue, #0066ff)", flexShrink: 0 }} />
+      <MapPin size={13} style={{ color: "var(--ar-blue, var(--ar-blue))", flexShrink: 0 }} />
       <span>{name}</span>
     </span>
   );

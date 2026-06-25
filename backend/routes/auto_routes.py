@@ -705,6 +705,51 @@ async def body_type_counts(svc: AutoService = Depends(get_auto_service)):
 from models.auto_engagement import AutoInterestCreate, AutoOfferCreate
 
 
+@router.post("/admin/deposits/{deposit_id}/refund")
+async def admin_refund_deposit(
+    deposit_id: str,
+    payload: Dict[str, Any] = None,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Admin-initiated deposit refund — flips deposit_status back to refunded
+    and zeroes the user's bidding flag. Used when a bid is unsuccessful and
+    the customer asks for the deposit back.
+
+    NOTE: actual Stripe refund call lives in `admin_payment_routes.py`; this
+    endpoint only updates the Auto-domain bookkeeping. Calling code should
+    also POST to the Stripe-refund endpoint with the transaction id.
+    """
+    dep = await db.auto_deposits.find_one({"id": deposit_id})
+    if not dep:
+        raise HTTPException(404, "Депозит не найден.")
+    if dep.get("status") == "refunded":
+        return {"ok": True, "already": True}
+
+    reason = (payload or {}).get("reason", "manual")
+    now = datetime.utcnow()
+    await db.auto_deposits.update_one(
+        {"id": deposit_id},
+        {"$set": {
+            "status": "refunded",
+            "refunded_at": now,
+            "refund_reason": reason,
+        }},
+    )
+    # Lift bidding rights if the user has no other verified deposit.
+    other = await db.auto_deposits.count_documents({
+        "user_id": dep["user_id"],
+        "status": "verified",
+        "id": {"$ne": deposit_id},
+    })
+    if other == 0:
+        await db.users.update_one(
+            {"id": dep["user_id"]},
+            {"$set": {"deposit_status": "refunded", "bidding_enabled": False}},
+        )
+    return {"ok": True, "deposit_id": deposit_id, "reason": reason}
+
+
 @router.post("/interests")
 async def create_interest(
     payload: AutoInterestCreate,
