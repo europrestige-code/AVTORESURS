@@ -33,6 +33,7 @@ import AutoAuctionsCalendar from "./pages/auto/AutoAuctionsCalendar";
 import AutoTerms from "./pages/auto/AutoTerms";
 import CategoryPage, { CATEGORY_DEFS } from "./pages/auto/CategoryPage";
 import MySearches from "./pages/auto/MySearches";
+import AutoAuctionEvent from "./pages/auto/AutoAuctionEvent";
 
 const Home = () => {
   return (
@@ -166,6 +167,7 @@ function App() {
                 <Route path="trucks" element={<CategoryPage category={CATEGORY_DEFS.trucks} />} />
                 <Route path="machinery" element={<CategoryPage category={CATEGORY_DEFS.machinery} />} />
                 <Route path="my/searches" element={<MySearches />} />
+                <Route path="auctions/event/:eventId" element={<AutoAuctionEvent />} />
               </Route>
 
               {/* Regular app routes */}

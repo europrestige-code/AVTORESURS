@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import autoApi from "../../services/autoApi";
 import { useAuth } from "../../contexts/AuthContext";
 import { MapPin } from "lucide-react";
@@ -206,17 +207,13 @@ export default function AutoAuctionsCalendar() {
                     <td><CityTag name={e.city || "—"} testid={`event-city-${e.key}`} /></td>
                     <td style={{ fontWeight: 700 }}>{e.lots}</td>
                     <td>
-                      {e.auction_url && (
-                        <a
-                          href={e.auction_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="auto-btn auto-btn-outline"
-                          data-testid={`auction-link-${e.key}`}
-                        >
-                          Открыть
-                        </a>
-                      )}
+                      <Link
+                        to={`/auto/auctions/event/${encodeURIComponent(e.event_id || e.key)}`}
+                        className="auto-btn auto-btn-outline"
+                        data-testid={`auction-link-${e.event_id || e.key}`}
+                      >
+                        Открыть
+                      </Link>
                     </td>
                   </tr>
                 );

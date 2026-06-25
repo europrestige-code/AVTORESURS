@@ -118,7 +118,9 @@ class AuctionEvent:
         return f"{self.source}:{self.auction_url or self.title + '|' + self.branch + '|' + (self.starts_at.isoformat() if self.starts_at else '')}"
 
     def to_doc(self) -> Dict[str, Any]:
+        import hashlib
         return {
+            "event_id": hashlib.sha1(self.key.encode("utf-8")).hexdigest()[:12],
             "key": self.key,
             "source": self.source,
             "category": self.category,
@@ -426,6 +428,7 @@ class AuctionCalendarService:
     async def ensure_indexes(self) -> None:
         try:
             await self.db.auto_auction_calendar.create_index("key", unique=True)
+            await self.db.auto_auction_calendar.create_index("event_id")
             await self.db.auto_auction_calendar.create_index("starts_at")
             await self.db.auto_auction_calendar.create_index("city")
             await self.db.auto_auction_calendar.create_index("category")
@@ -491,6 +494,9 @@ class AuctionCalendarService:
                 d["starts_at"] = d["starts_at"].isoformat()
             if isinstance(d.get("fetched_at"), datetime):
                 d["fetched_at"] = d["fetched_at"].isoformat()
+            if not d.get("event_id") and d.get("key"):
+                import hashlib
+                d["event_id"] = hashlib.sha1(d["key"].encode("utf-8")).hexdigest()[:12]
             out.append(translate_event_doc(d))
         return out
 
@@ -515,3 +521,53 @@ class AuctionCalendarService:
             v["categories"] = sorted(list(v["categories"]))
             out.append(v)
         return out
+
+    async def event_with_vehicles(self, event_id: str) -> Optional[Dict[str, Any]]:
+        """Return an auction event by its short sha1 id together with any
+        vehicles in our catalogue that we believe belong to this auction
+        (same source + city, ending within a ±36h window around the start)."""
+        from services.auto_auctions_i18n import translate_event_doc
+        # Look up by event_id; if missing (legacy docs) compute it on the
+        # fly from `key` to be tolerant.
+        doc = await self.db.auto_auction_calendar.find_one({"event_id": event_id})
+        if not doc:
+            import hashlib
+            async for d in self.db.auto_auction_calendar.find({}, {"_id": 0, "key": 1, "event_id": 1}):
+                k = d.get("key")
+                if k and hashlib.sha1(k.encode("utf-8")).hexdigest()[:12] == event_id:
+                    doc = await self.db.auto_auction_calendar.find_one({"key": k})
+                    if doc:
+                        await self.db.auto_auction_calendar.update_one(
+                            {"key": k}, {"$set": {"event_id": event_id}}
+                        )
+                    break
+        if not doc:
+            return None
+        doc.pop("_id", None)
+        if isinstance(doc.get("starts_at"), datetime):
+            starts_at_dt = doc["starts_at"]
+            doc["starts_at"] = starts_at_dt.isoformat()
+        else:
+            starts_at_dt = None
+        if isinstance(doc.get("fetched_at"), datetime):
+            doc["fetched_at"] = doc["fetched_at"].isoformat()
+        # Vehicles: try to find anything ending within ±36h around the
+        # auction start that comes from the same source. The match is
+        # intentionally fuzzy because most importers don't carry the live
+        # event id.
+        vehicles: List[Dict[str, Any]] = []
+        if starts_at_dt:
+            lo = starts_at_dt - timedelta(hours=12)
+            hi = starts_at_dt + timedelta(hours=36)
+            q: Dict[str, Any] = {
+                "status": "available",
+                "auction_ends_at": {"$gte": lo, "$lte": hi},
+            }
+            if doc.get("source"):
+                q["source"] = doc["source"]
+            async for v in self.db.auto_vehicles.find(q, {"_id": 0}).sort("auction_ends_at", 1).limit(40):
+                for k in ("auction_ends_at", "created_at", "updated_at"):
+                    if isinstance(v.get(k), datetime):
+                        v[k] = v[k].isoformat()
+                vehicles.append(v)
+        return {"event": translate_event_doc(doc), "vehicles": vehicles}

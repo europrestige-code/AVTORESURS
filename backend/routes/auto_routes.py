@@ -408,6 +408,24 @@ async def auctions_calendar(
     return {"events": events, "by_day": days, "count": len(events)}
 
 
+@router.get("/auctions/events/{event_id}")
+async def auctions_event_detail(
+    event_id: str,
+    db=Depends(get_db),
+):
+    """Internal mirror of a single auction event — keeps the visitor on
+    АвтоРесурс instead of bouncing them to Turners/Manheim. Looks the event
+    up by its stable `event_id` (sha1 of `key`) and augments the payload
+    with the vehicles in our catalogue that belong to the same auction
+    window/branch."""
+    from services.auto_auctions_service import AuctionCalendarService
+    svc = AuctionCalendarService(db)
+    res = await svc.event_with_vehicles(event_id)
+    if not res:
+        raise HTTPException(404, "Аукцион не найден.")
+    return res
+
+
 @router.post("/admin/auctions/refresh")
 async def admin_refresh_auctions(
     payload: Optional[Dict[str, Any]] = Body(None),

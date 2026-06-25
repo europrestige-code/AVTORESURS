@@ -1062,6 +1062,23 @@ a[href*="emergentlabs.ai"][target="_blank"] {
   border-top: 1px dashed rgba(255,255,255,0.08);
 }
 .auto-root .my-searches__list { display: flex; flex-direction: column; gap: 12px; }
+
+/* --- Auction event mirror page --- */
+.auto-root .auction-event__hero { padding: 22px 22px 20px; }
+.auto-root .auction-event__title-row {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+}
+.auto-root .auction-event__meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.auto-root .auction-event__ctas { display: flex; gap: 8px; flex-wrap: wrap; }
+.auto-root .auction-event__cards-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 12px;
+}
+.auto-root .auction-event__empty {
+  padding: 20px; max-width: 720px;
+}
+
 .auto-root .my-searches__item { padding: 16px; }
 .auto-root .my-searches__head {
   display: flex; justify-content: space-between; align-items: flex-start;

@@ -198,6 +198,7 @@ export default function AutoHome() {
             events.map((e, i) => {
               const city = e.city || e.branch || "—";
               return {
+                event_id: e.event_id || e.key,
                 city,
                 source: sourceFromBranch(e.branch),
                 lots: e.lot_count || 0,
@@ -544,7 +545,7 @@ function AuctionCard({ a, now, i }) {
         <div className="mt-0.5 text-xs text-gray-400">{a.source}</div>
         <div className="mt-2 text-sm text-gray-300">{(a.lots || 0).toLocaleString("ru-RU")} лотов</div>
         <Link
-          to="/auto/auctions"
+          to={a.event_id ? `/auto/auctions/event/${encodeURIComponent(a.event_id)}` : "/auto/auctions"}
           className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-blue-400 transition hover:text-blue-300"
           data-testid={`auction-card-${i}-link`}
         >
