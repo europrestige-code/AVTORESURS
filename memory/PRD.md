@@ -45,19 +45,27 @@ The DB stores them in separate collections (`auto_offers` vs `auto_bids`).
 
 ## V2 backlog (post-MVP)
 - Migrate 36 hex literals to `--ar-*` CSS tokens
-- Motorbikes vertical (Turners + Manheim)
-- Спецтехника vertical
-- Deep CRM timeline (chat + email + bids per client)
-- Refactor `auto_routes.py` (1700 lines) into sub-routers
-- Refunds endpoint for unsuccessful bids
+- Motorbikes vertical (Turners + Manheim) — UI/routes ready; data pipeline pending
+- Спецтехника vertical — UI/routes ready; data pipeline pending
+- Refunds endpoint for unsuccessful bids (done — `/api/auto/admin/deposits/{id}/refund`)
 - 2FA admin login
 - "Похожие проданы за NZ$X-Y" block (needs sold-price history)
-- AI подборщик quiz inside Татьяна
 - Phase 4 (Japanese auctions) — declined by user
 - Mobile / separate admin app
+
+## Done in iter10–iter11 (25.06.2026)
+- **RUB primary / NZD secondary** price display across `PriceGuidance.jsx` (two-line layout) and `VehicleCard.jsx` (RUB main, NZD muted subtitle).
+- **АИ-подборщик** — 5-step quiz inside the Татьяна chat widget. CTA `Подобрать авто за 60 секунд`. Posts to `/api/auto/quiz/submit`, persists to `auto_quiz_leads`, mirrors into `auto_interests (source='quiz')`, returns ranked matches (`AutoQuizService._match`).
+- **Deep CRM timeline** — `routes/auto/admin_crm.py` + `services/auto_crm_timeline.py`. Admin → Клиенты merges registered users + anonymous leads with `interests/offers/bids/chat_messages/quiz_leads` counts, `last_activity`, `total_events`. Click row → drawer shows a merged chronological timeline of all six event types with coloured pills.
+- **auto_routes.py refactor** — extracted chat/quiz, engagement, admin-CRM endpoints into `routes/auto/{chat_quiz, engagement, admin_crm, _deps}.py`. Aggregated via `router.include_router` at the bottom of `auto_routes.py`. 26/26 pytest GREEN (iter10 + iter11).
+
+## Still pending refactor
+- Peel out `routes/auto/{intel, sources, importers, payments, email, vehicles}.py` so `auto_routes.py` (~1700 lines) keeps shrinking.
+- Add `routes/auto/__init__.py` aggregator or delete `routes/auto/_deps.py` import duplication once additional sub-routers are extracted.
 
 ## Production launch checklist
 1. Profile → Universal Key — ensure balance for chat + email
 2. Admin → Settings — drop production Mailchimp / Sendsay keys
 3. Admin → Settings — switch Stripe to live mode
 4. End-to-end customer flow: register → deposit → bid → win → CRM order
+

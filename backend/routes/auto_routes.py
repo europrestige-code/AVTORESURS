@@ -1707,7 +1707,9 @@ async def vehicles_similar(
 from routes.auto import chat_quiz as _chat_quiz_module
 from routes.auto import engagement as _engagement_module
 from routes.auto import admin_crm as _admin_crm_module
+from routes.auto import saved_search as _saved_search_module
 
 router.include_router(_chat_quiz_module.router)
 router.include_router(_engagement_module.router)
 router.include_router(_admin_crm_module.router)
+router.include_router(_saved_search_module.router)

@@ -764,6 +764,15 @@
 
 /* --- AI Quiz inside chat panel --- */
 .auto-root .chat-panel__body--quiz { padding: 14px; gap: 0; }
+.auto-root .chat-panel__mode-switch {
+  display: flex; justify-content: flex-end; margin-bottom: 8px;
+}
+.auto-root .chat-mode-link {
+  background: transparent; border: none; color: var(--auto-muted);
+  cursor: pointer; font-size: 11px; text-decoration: underline;
+  padding: 4px 0;
+}
+.auto-root .chat-mode-link:hover { color: #fff; }
 .auto-root .chat-panel__quick--top {
   border-top: none;
   border-bottom: 1px solid var(--auto-border);
@@ -1004,4 +1013,61 @@ a[href*="emergentlabs.ai"][target="_blank"] {
   white-space: pre-wrap; word-wrap: break-word;
 }
 .auto-root .crm-event__meta { font-size: 11px; margin-top: 4px; }
+
+
+/* --- Save Search modal --- */
+.auto-root .save-search-btn {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.auto-root .save-search-modal {
+  position: fixed; inset: 0; z-index: 9998;
+  display: flex; align-items: center; justify-content: center;
+}
+.auto-root .save-search-modal__backdrop {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+}
+.auto-root .save-search-modal__panel {
+  position: relative; z-index: 1;
+  background: #0d0d0d; border: 1px solid var(--auto-border);
+  border-radius: 16px; padding: 22px;
+  width: min(440px, calc(100vw - 32px));
+  box-shadow: 0 28px 50px rgba(0,0,0,0.55);
+}
+.auto-root .save-search-modal__head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.auto-root .save-search-modal__warn {
+  background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245,158,11,0.4);
+  color: #f59e0b; padding: 8px 12px; border-radius: 8px; font-size: 12px;
+  margin-bottom: 12px;
+}
+.auto-root .save-search-channels { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.auto-root .save-search-channel {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; padding: 10px 12px;
+  background: #131313; border: 1px solid var(--auto-border); border-radius: 10px;
+  cursor: pointer;
+}
+.auto-root .save-search-channel input { accent-color: var(--auto-primary); }
+.auto-root .save-search-channel .auto-muted { margin-left: auto; font-size: 11px; }
+
+/* --- My searches page --- */
+.auto-root .my-searches__tg {
+  padding: 16px;
+}
+.auto-root .my-searches__tg-link {
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px dashed rgba(255,255,255,0.08);
+}
+.auto-root .my-searches__list { display: flex; flex-direction: column; gap: 12px; }
+.auto-root .my-searches__item { padding: 16px; }
+.auto-root .my-searches__head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 12px; flex-wrap: wrap;
+}
+.auto-root .my-searches__filters {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+}
 

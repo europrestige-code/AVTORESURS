@@ -4,6 +4,7 @@ import autoApi from "../../services/autoApi";
 import VehicleCard from "../../components/auto/VehicleCard";
 import VehicleFilters from "../../components/auto/VehicleFilters";
 import SearchHero from "../../components/auto/SearchHero";
+import SaveSearchButton from "../../components/auto/SaveSearchButton";
 
 const LIMIT = 12;
 
@@ -72,6 +73,7 @@ export default function AutoCatalog() {
           <h1 style={{ fontSize: 28, margin: 0 }}>Каталог автомобилей</h1>
           <div className="auto-muted" data-testid="catalog-count">Найдено: {total}</div>
         </div>
+        <SaveSearchButton filters={filters} total={total} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 18 }} className="catalog-grid">
         <aside>

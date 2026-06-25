@@ -32,6 +32,7 @@ import AutoAustralia from "./pages/auto/AutoAustralia";
 import AutoAuctionsCalendar from "./pages/auto/AutoAuctionsCalendar";
 import AutoTerms from "./pages/auto/AutoTerms";
 import CategoryPage, { CATEGORY_DEFS } from "./pages/auto/CategoryPage";
+import MySearches from "./pages/auto/MySearches";
 
 const Home = () => {
   return (
@@ -164,6 +165,7 @@ function App() {
                 <Route path="motorcycles" element={<CategoryPage category={CATEGORY_DEFS.motorcycles} />} />
                 <Route path="trucks" element={<CategoryPage category={CATEGORY_DEFS.trucks} />} />
                 <Route path="machinery" element={<CategoryPage category={CATEGORY_DEFS.machinery} />} />
+                <Route path="my/searches" element={<MySearches />} />
               </Route>
 
               {/* Regular app routes */}

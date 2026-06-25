@@ -27,6 +27,8 @@ export default function QuizFlow({ onClose, onSubmitted }) {
     budget_key: null,
     country: null,
     urgency: null,
+    repair: null,
+    buyer_type: null,
     name: "",
     contact: "",
     city: "",
@@ -57,7 +59,7 @@ export default function QuizFlow({ onClose, onSubmitted }) {
   ];
 
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
-  const next = () => setStep((s) => Math.min(s + 1, 4));
+  const next = () => setStep((s) => Math.min(s + 1, 5));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const submit = async () => {
@@ -174,7 +176,7 @@ export default function QuizFlow({ onClose, onSubmitted }) {
   return (
     <div className="quiz-flow" data-testid="quiz-flow">
       <div className="quiz-flow__header">
-        <Sparkles size={14} /> АИ-подборщик · шаг {step + 1} из 5
+        <Sparkles size={14} /> АИ-подборщик · шаг {step + 1} из 6
       </div>
 
       {step === 0 && (
@@ -296,6 +298,46 @@ export default function QuizFlow({ onClose, onSubmitted }) {
           step={step} busy={busy} error={error}
           onBack={back} onNext={next} onSubmit={submit}
           canSubmit={form.name.trim() && form.contact.trim()}
+          title="Готовы рассматривать ремонтные авто?"
+          hint="Часто это позволяет сэкономить 30–50% от стоимости."
+          canNext={!!form.repair && !!form.buyer_type}
+        >
+          <div className="quiz-group-label">Состояние</div>
+          <div className="quiz-pills">
+            {(meta.repairs || []).map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                className={`quiz-pill ${form.repair === r.key ? "is-active" : ""}`}
+                onClick={() => update({ repair: r.key })}
+                data-testid={`quiz-repair-${r.key}`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <div className="quiz-group-label">Кто покупает</div>
+          <div className="quiz-pills">
+            {(meta.buyer_types || []).map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                className={`quiz-pill ${form.buyer_type === b.key ? "is-active" : ""}`}
+                onClick={() => update({ buyer_type: b.key })}
+                data-testid={`quiz-buyer-${b.key}`}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </QuizStep>
+      )}
+
+      {step === 5 && (
+        <QuizStep
+          step={step} busy={busy} error={error}
+          onBack={back} onNext={next} onSubmit={submit}
+          canSubmit={form.name.trim() && form.contact.trim()}
           title="Куда отправить подборку?"
           hint="Запишем заявку и подберём авто под параметры. Никакого спама."
           canNext={!!form.name && !!form.contact}
@@ -376,7 +418,7 @@ function QuizStep({
             Назад
           </button>
         )}
-        {step < 4 && (
+        {step < 5 && (
           <button
             type="button"
             className="auto-btn"
@@ -387,7 +429,7 @@ function QuizStep({
             Далее
           </button>
         )}
-        {step === 4 && (
+        {step === 5 && (
           <button
             type="button"
             className="auto-btn"

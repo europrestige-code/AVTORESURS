@@ -45,6 +45,20 @@ URGENCY_LABELS = {
 }
 
 
+REPAIR_LABELS = {
+    "no":     "Только целое авто",
+    "light":  "Готов на лёгкий ремонт",
+    "any":    "Беру под полное восстановление",
+}
+
+
+BUYER_TYPE_LABELS = {
+    "private":  "Для себя",
+    "dealer":   "Я дилер / для перепродажи",
+    "company":  "От компании / парк",
+}
+
+
 def _purpose_to_body_types(purpose: Optional[str]) -> List[str]:
     """Heuristic mapping from declared purpose to canonical body-type keys.
 
@@ -90,6 +104,8 @@ class AutoQuizService:
             body_types = _purpose_to_body_types(purpose)
         country = payload.get("country")  # "NZ" | "AU" | None
         urgency = payload.get("urgency")
+        repair = payload.get("repair")            # "no" | "light" | "any"
+        buyer_type = payload.get("buyer_type")    # "private" | "dealer" | "company"
         city = (payload.get("city") or "").strip() or None
         notes = (payload.get("notes") or "").strip() or None
 
@@ -106,6 +122,10 @@ class AutoQuizService:
             "purpose_label": PURPOSE_LABELS.get(purpose),
             "urgency": urgency,
             "urgency_label": URGENCY_LABELS.get(urgency),
+            "repair": repair,
+            "repair_label": REPAIR_LABELS.get(repair),
+            "buyer_type": buyer_type,
+            "buyer_type_label": BUYER_TYPE_LABELS.get(buyer_type),
             "country": country,
             "notes": notes,
             "user_id": user_id,
@@ -128,6 +148,10 @@ class AutoQuizService:
             msg_parts.append(f"Страна: {country}")
         if urgency:
             msg_parts.append(f"Срочность: {URGENCY_LABELS.get(urgency, urgency)}")
+        if repair:
+            msg_parts.append(f"Ремонт: {REPAIR_LABELS.get(repair, repair)}")
+        if buyer_type:
+            msg_parts.append(f"Покупатель: {BUYER_TYPE_LABELS.get(buyer_type, buyer_type)}")
         if notes:
             msg_parts.append(f"Заметки: {notes}")
         interest = AutoInterestCreate(
@@ -151,6 +175,7 @@ class AutoQuizService:
             budget_nzd=budget_nzd,
             body_types=body_types,
             country=country,
+            repair=repair,
             limit=int(payload.get("limit", 6)),
         )
 
@@ -165,11 +190,17 @@ class AutoQuizService:
         budget_nzd: Optional[float],
         body_types: List[str],
         country: Optional[str],
+        repair: Optional[str] = None,
         limit: int = 6,
     ) -> List[Dict[str, Any]]:
         q: Dict[str, Any] = {"status": "available"}
         if country in ("NZ", "AU"):
             q["country"] = country
+        # Damage preference
+        if repair == "no":
+            q["damage_type"] = {"$in": [None, ""]}
+        elif repair == "any":
+            q["damage_type"] = {"$nin": [None, ""], "$exists": True}
         if budget_nzd:
             # Compare against the AI estimate range, falling back to current price.
             # We use $or so vehicles without ai_estimate still match if their
@@ -231,5 +262,11 @@ def get_quiz_meta() -> Dict[str, Any]:
             {"key": "NZ", "label": "Новая Зеландия"},
             {"key": "AU", "label": "Австралия"},
             {"key": None, "label": "Не важно"},
+        ],
+        "repairs": [
+            {"key": k, "label": v} for k, v in REPAIR_LABELS.items()
+        ],
+        "buyer_types": [
+            {"key": k, "label": v} for k, v in BUYER_TYPE_LABELS.items()
         ],
     }

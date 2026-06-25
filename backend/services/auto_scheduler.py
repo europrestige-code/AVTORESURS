@@ -113,7 +113,7 @@ async def _campaign_loop(db) -> None:
 
 def start(db) -> None:
     """Start both background loops. Safe to call once at startup."""
-    global _auc_task, _camp_task, _intel_task
+    global _auc_task, _camp_task, _intel_task, _saved_search_task
     loop = asyncio.get_event_loop()
     if not _auc_task or _auc_task.done():
         _auc_task = loop.create_task(_refresh_loop(db), name="auto-auctions-refresh")
@@ -124,9 +124,15 @@ def start(db) -> None:
     if not _intel_task or _intel_task.done():
         _intel_task = loop.create_task(_intel_loop(db), name="auto-intel-estimates")
         logger.info("[scheduler] started AI-estimate generator (hourly)")
+    if not _saved_search_task or _saved_search_task.done():
+        _saved_search_task = loop.create_task(_saved_search_loop(db), name="auto-saved-searches")
+        logger.info("[scheduler] started saved-search notifier (15 min)")
 
 
 _intel_task = None
+_saved_search_task = None
+_last_saved_search_at: Optional[datetime] = None
+_last_saved_search_result: Optional[dict] = None
 
 
 async def _intel_loop(db) -> None:
@@ -155,10 +161,37 @@ async def _intel_loop(db) -> None:
 
 
 def stop() -> None:
-    global _auc_task, _camp_task
-    for t in (_auc_task, _camp_task):
+    global _auc_task, _camp_task, _intel_task, _saved_search_task
+    for t in (_auc_task, _camp_task, _intel_task, _saved_search_task):
         if t and not t.done():
             t.cancel()
+
+
+SAVED_SEARCH_INTERVAL_SECONDS = 15 * 60  # 15 minutes
+SAVED_SEARCH_INITIAL_DELAY_SECONDS = 180
+
+
+async def _saved_search_loop(db) -> None:
+    """Every 15 minutes: scan saved searches against newly-imported vehicles
+    and push notifications (email + Telegram) via the notifier."""
+    global _last_saved_search_at, _last_saved_search_result
+    from services.auto_saved_search_service import AutoSavedSearchService
+    await asyncio.sleep(SAVED_SEARCH_INITIAL_DELAY_SECONDS)
+    while True:
+        try:
+            res = await AutoSavedSearchService(db).run_all()
+            _last_saved_search_at = datetime.utcnow()
+            _last_saved_search_result = res
+            if res.get("notified"):
+                logger.info(
+                    f"[scheduler] saved-search run: {res['notified']} subscribers notified "
+                    f"({res['matches']} matches across {res['searches']} searches)"
+                )
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"[scheduler] saved-search loop failed: {e}")
+        await asyncio.sleep(SAVED_SEARCH_INTERVAL_SECONDS)
 
 
 def status() -> dict:
@@ -174,5 +207,11 @@ def status() -> dict:
             "slots_nz_local": [t.strftime("%H:%M") for t in CAMPAIGN_SLOTS_NZ],
             "last_run_at": _last_camp_at.isoformat() if _last_camp_at else None,
             "last_result": _last_camp_result,
+        },
+        "saved_searches": {
+            "running": bool(_saved_search_task and not _saved_search_task.done()),
+            "interval_seconds": SAVED_SEARCH_INTERVAL_SECONDS,
+            "last_run_at": _last_saved_search_at.isoformat() if _last_saved_search_at else None,
+            "last_result": _last_saved_search_result,
         },
     }

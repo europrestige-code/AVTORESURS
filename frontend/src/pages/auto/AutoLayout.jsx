@@ -61,6 +61,9 @@ export default function AutoLayout() {
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
+                <NavLink to="/auto/my/searches" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 h-12 text-sm hover:bg-white/10" data-testid="nav-my-searches">
+                  Мои подписки
+                </NavLink>
                 <NavLink to="/auto/dashboard" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 h-12 text-sm hover:bg-white/10" data-testid="nav-dashboard">
                   Мой кабинет
                 </NavLink>

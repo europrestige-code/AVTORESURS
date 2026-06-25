@@ -1,16 +1,6 @@
-"""AutoResource (АвтоРесурс) router package.
+"""AutoResource (АвтоРесурс) router sub-package.
 
-Splits the formerly 1900-line `auto_routes.py` into themed sub-routers.
-Importers should keep using `from routes.auto_routes import router` — that
-module simply re-exports the aggregated router built here.
+Sub-modules (chat_quiz, engagement, admin_crm) are imported and included
+directly from `routes.auto_routes.router` at the bottom of that file.
+This package is just a namespace — it intentionally exports nothing.
 """
-from fastapi import APIRouter
-
-from . import chat_quiz, engagement, admin_crm
-
-router = APIRouter(prefix="/api/auto", tags=["Auto"])
-router.include_router(chat_quiz.router)
-router.include_router(engagement.router)
-router.include_router(admin_crm.router)
-
-__all__ = ["router"]

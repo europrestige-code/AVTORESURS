@@ -20,12 +20,13 @@ function saveHistory(history) {
 
 const GREETING = {
   role: "assistant",
-  content: "Здравствуйте! Я Татьяна — ИИ-ассистент АвтоРесурс. Помогу разобраться с покупкой авто из НЗ или Австралии. Что вас интересует?",
+  content: "Здравствуйте! Я Татьяна — помогу подобрать авто из НЗ или Австралии. Расскажите, что ищете — за 60 секунд предложу варианты.",
 };
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState("chat"); // "chat" | "quiz"
+  // Tatiana opens in selling mode (quiz) by default — free chat is one click away.
+  const [mode, setMode] = useState("quiz"); // "chat" | "quiz"
   const [history, setHistory] = useState(() => {
     const h = loadHistory();
     return h.length ? h : [GREETING];
@@ -131,6 +132,16 @@ export default function ChatWidget() {
 
           {mode === "quiz" ? (
             <div className="chat-panel__body chat-panel__body--quiz">
+              <div className="chat-panel__mode-switch">
+                <button
+                  type="button"
+                  className="chat-mode-link"
+                  onClick={() => setMode("chat")}
+                  data-testid="chat-switch-to-free"
+                >
+                  Просто задать вопрос →
+                </button>
+              </div>
               <QuizFlow onClose={closeQuiz} />
             </div>
           ) : (
@@ -158,9 +169,7 @@ export default function ChatWidget() {
                   <Sparkles size={14} style={{ marginRight: 6, verticalAlign: "text-bottom" }} />
                   Подобрать авто за 60 секунд
                 </button>
-              </div>
-
-              {history.length <= 1 && (
+              </div>              {history.length <= 1 && (
                 <div className="chat-panel__quick">
                   {QUICK_QUESTIONS.map((q, i) => (
                     <button

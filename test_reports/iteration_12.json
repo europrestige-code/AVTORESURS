@@ -1,0 +1,42 @@
+{
+  "summary": "Iter12 — Saved Searches (email+Telegram) + new Tatiana quiz steps (repair, buyer_type) fully verified. Backend: 12/12 pytest GREEN after fixing one timezone-comparison bug in telegram_webhook. Frontend: chat now defaults to quiz mode, 6-step flow with repair+buyer step completes and returns matches; SaveSearch modal+MySearches page work for logged-in users; logged-out users get the need-login screen.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auto/telegram/webhook", "issue": "FIXED — was returning 500 due to naive-vs-aware datetime comparison (Mongo returns naive, _now() is utc-aware). Patched /app/backend/routes/auto/saved_search.py to normalise expires_at to UTC before comparing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "MySearches subscription cards", "issue": "Cards do not carry the expected data-testid prefix 'my-search-card-' — querySelectorAll returned 0 even though cards render (verified visually). Other testids (my-searches-need-login, my-searches-tg-bind) work as specified.", "selector": "[data-testid^=\"my-search-card-\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter12_saved_searches.py",
+    "/app/test_reports/pytest/iter12.xml"
+  ],
+  "action_items": [
+    "(optional) Add `data-testid=\"my-search-card-{id}\"` to each subscription card root in MySearches.jsx so e2e tests can iterate them deterministically.",
+    "Code-review nit: services/auto_saved_search_service.py — _filters_to_mongo treats `damage_only=False` the same as None (the `if f.damage_only:` branch is skipped); if you want to allow explicit «only undamaged» you need a tri-state.",
+    "Code-review nit: auto_saved_search_service.run_all stores `last_match_ids` as the last 100 ids, but the dedupe window is also gated by `created_at > last_run_at`, which means the explicit dedupe is largely redundant unless vehicles are re-imported with stale created_at."
+  ],
+  "critical_code_review_comments": [
+    "routes/auto/saved_search.py:199 had a naive/aware datetime crash on the Telegram /start path — fixed in-place; PLEASE keep the fix and add a regression test.",
+    "models/auto_saved_search.py keeps both `price_from_nzd` AND `price_from_rub` as independent optional fields — the conversion is silent in _filters_to_mongo. If a caller sets both, NZD wins without warning; consider normalising at the Pydantic layer.",
+    "saved_search.py duplicates `from services.auto_saved_search_service import AutoSavedSearchService` inside every handler. Move to module-level to avoid the per-request import cost and to surface circular-import problems early.",
+    "auto_notify_service.send_email swallows every Resend failure as `status:error` — fine for the runner, but the modal flow could surface a friendlier 'mail not sent' to the user when their email is not europrestige@gmail.com."
+  ],
+  "updated_files": [
+    "/app/backend/routes/auto/saved_search.py (1-line tz fix in telegram_webhook)",
+    "/app/backend/tests/test_iter12_saved_searches.py (NEW — 12 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (12/12 iter12)", "frontend": "100% on requested flows"},
+  "test_credentials": "client@buyanywhere.com / client12345 ; admin@buyanywhere.com / admin12345",
+  "seed_data_creation": "Three temporary leads created by /quiz/submit (TEST_iter12_quiz / TEST_iter12_quiz_nofilter / TEST_iter12_ui) and visible in admin Клиенты as kind=lead. One TEST_iter12_subscription saved-search was created via the UI and deleted at the end of the run. Telegram tokens for chat_id=99 were inserted and the binding was reset via /telegram/unbind.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Verified endpoints (all 200 unless noted): GET /api/auto/quiz/meta now exposes 'repairs' (no/light/any) and 'buyer_types' (private/dealer/company). POST /api/auto/quiz/submit accepts repair + buyer_type and filters damage_type accordingly. POST /api/auto/saved-searches/preview is public and returns {matches:[], fx_rate:Number}. POST /api/auto/saved-searches (auth) creates a row; GET /api/auto/saved-searches lists them; PATCH /toggle flips enabled; DELETE removes. POST /api/auto/telegram/start-binding returns deep_link + token + bot_username='AvtoresursAlertsBot'. GET /api/auto/telegram/binding-status reports {bound, chat_id}. POST /api/auto/telegram/webhook with /start link_<token> now binds correctly (after the naive-vs-aware datetime fix). POST /api/auto/admin/saved-searches/run returns {searches,notified,matches,errors} as ints. Frontend testids confirmed: chat-fab, quiz-flow, chat-switch-to-free, quiz-step-0..5, quiz-purpose-*, quiz-body-*, quiz-budget-*, quiz-country-*, quiz-urgency-*, quiz-repair-*, quiz-buyer-*, quiz-name-input, quiz-contact-input, quiz-next-btn, quiz-submit-btn, quiz-result, save-search-btn, save-search-modal, save-search-name, save-search-email, save-search-telegram, save-search-submit, save-search-done, my-searches-need-login, my-searches-tg-bind. Step ordering in QuizFlow: 0=purpose, 1=body, 2=budget, 3=country+urgency, 4=repair+buyer, 5=name+contact (= '6 шагов' counter).",
+  "rca of the issue": "Bug: POST /api/auto/telegram/webhook returned 500 for valid /start link_<token> payloads. Root cause: saved_search.py:199 compared `doc['expires_at']` (read back from Mongo as a naive datetime) against `_now()` (timezone.utc-aware), which raises TypeError. Reproduction: POST /api/auto/telegram/webhook {message:{chat:{id:99},text:'/start link_<token>'}}. Mitigation applied: normalise `expires_at` to UTC before comparing (re-attach tzinfo if naive)."
+}
