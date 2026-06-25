@@ -288,6 +288,135 @@ async def fetch_turners_auctions(category: str = "cars") -> List[AuctionEvent]:
     return events
 
 
+# ----- Manheim NZ -----
+
+MANHEIM_CATALOGUE_URL = "https://www.manheim.co.nz/home/auction-catalogue?inheritMasterPage=False"
+
+ENDS_IN_RE = re.compile(
+    r"Ends?\s*in\s*(?:(\d+)\s*d)?\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?",
+    re.IGNORECASE,
+)
+LOTS_TRAILING_RE = re.compile(r"\((\d+)\)\s*$")
+
+MANHEIM_CATEGORY_MAP = {
+    "salvage":                "damaged",
+    "trucks, trailers & machinery": "trucks",
+    "cars & light commercial": "cars",
+    "passenger vehicles":     "cars",
+}
+
+
+def _manheim_starts_at(ends_in_text: str) -> Optional[datetime]:
+    """Manheim shows 'Ends in 6h 0m' or 'Ends in 3d 5h'. We treat that as
+    when the auction ends, which is also typically the live-sale moment for
+    Bid-Now style events. Convert to UTC-naive (we store everything UTC-naive)."""
+    m = ENDS_IN_RE.search(ends_in_text or "")
+    if not m:
+        return None
+    days = int(m.group(1) or 0)
+    hours = int(m.group(2) or 0)
+    mins = int(m.group(3) or 0)
+    if not (days or hours or mins):
+        return None
+    return datetime.utcnow() + timedelta(days=days, hours=hours, minutes=mins)
+
+
+MANHEIM_BRANCH_TO_CITY = {
+    "takanini":    "Auckland",
+    "manukau":     "Auckland",
+    "wiri":        "Auckland",
+    "north shore": "Auckland",
+    "hamilton":    "Hamilton",
+    "tauranga":    "Tauranga",
+    "wellington":  "Wellington",
+    "porirua":     "Wellington",
+    "christchurch":"Christchurch",
+    "rolleston":   "Christchurch",
+    "hornby":      "Christchurch",
+    "dunedin":     "Dunedin",
+    "national":    "National",
+}
+
+
+def _manheim_branch_city(branch: str) -> Optional[str]:
+    n = (branch or "").lower()
+    for key, city in MANHEIM_BRANCH_TO_CITY.items():
+        if key in n:
+            return city
+    return None
+
+
+def parse_manheim_page(html: str) -> List[AuctionEvent]:
+    """Parse https://www.manheim.co.nz/home/auction-catalogue into AuctionEvent list."""
+    events: List[AuctionEvent] = []
+    if not html:
+        return events
+    soup = BeautifulSoup(html, "html.parser")
+    rows = soup.select("table.events-list tr[class*=rowcount]")
+    for tr in rows:
+        tds = tr.find_all("td")
+        if len(tds) < 4:
+            continue
+        ends_in_text = " ".join(tds[0].stripped_strings)
+        starts_at = _manheim_starts_at(ends_in_text)
+        if not starts_at:
+            continue
+        a = tr.find("a", class_="name")
+        href = a.get("href") if a else None
+        title_full = " ".join(tds[1].stripped_strings)
+        # Strip the duplicated "Branch Branch (NI)" prefix that the template emits
+        m_lots = LOTS_TRAILING_RE.search(title_full)
+        lots = int(m_lots.group(1)) if m_lots else 0
+        # Branch: first word is the branch name (Takanini, Wellington, ...)
+        branch_token = title_full.split(" ")[0] if title_full else ""
+        # Title: drop "Bid Now"/"Buy Now"/"Simulcast" markers, lots count and
+        # the repeated branch prefix the template emits twice (e.g. "Takanini
+        # Takanini (NI) PRESTIGE AUCTION" → "PRESTIGE AUCTION").
+        clean = re.sub(r"\(\d+\)\s*$", "", title_full).strip()
+        clean = re.sub(r"\b(Bid Now|Buy Now|Simulcast)\b", "", clean, flags=re.IGNORECASE)
+        if branch_token:
+            # Strip the "Takanini Takanini (NI) " repeated prefix.
+            prefix_re = re.compile(
+                rf"^(?:{re.escape(branch_token)}\s*){{1,2}}\([A-Z]{{2}}\)\s*",
+                re.IGNORECASE,
+            )
+            clean = prefix_re.sub("", clean)
+        clean = re.sub(r"\s{2,}", " ", clean).strip()
+        cat_text = " ".join(tds[3].stripped_strings).lower()
+        category = MANHEIM_CATEGORY_MAP.get(cat_text, "cars")
+        full_url = "https://www.manheim.co.nz" + href if href and href.startswith("/") else (href or "")
+        events.append(AuctionEvent(
+            source="manheim",
+            category=category,
+            title=clean[:160] or "Manheim auction",
+            branch=branch_token,
+            city=_manheim_branch_city(branch_token) or branch_token or None,
+            starts_at=starts_at,
+            lots=lots,
+            auction_url=full_url or None,
+        ))
+    return events
+
+
+async def fetch_manheim_auctions() -> List[AuctionEvent]:
+    """Pull Manheim NZ catalogue. One HTTP call; failures swallowed and
+    surfaced as an empty list so the calendar refresh stays robust."""
+    try:
+        async with httpx.AsyncClient(
+            timeout=15.0, follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 AvtoResursBot/1.0"},
+        ) as client:
+            r = await client.get(MANHEIM_CATALOGUE_URL)
+            r.raise_for_status()
+            html = r.text
+    except Exception as e:
+        logger.warning(f"Manheim catalogue fetch failed: {e}")
+        return []
+    return parse_manheim_page(html)
+
+
+# ----- Persistence -----
+
 class AuctionCalendarService:
     """Persistence + queries for the auction calendar."""
 
@@ -300,26 +429,45 @@ class AuctionCalendarService:
             await self.db.auto_auction_calendar.create_index("starts_at")
             await self.db.auto_auction_calendar.create_index("city")
             await self.db.auto_auction_calendar.create_index("category")
+            await self.db.auto_auction_calendar.create_index("source")
         except Exception as e:
             logger.warning(f"Auction calendar indexes failed: {e}")
 
     async def refresh(self, categories: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Re-fetch and upsert. Returns summary."""
+        """Re-fetch from Turners (per-category) AND Manheim (single
+        catalogue) and upsert. Returns summary."""
         categories = categories or ["cars", "damaged", "trucks"]
         total = 0
         per_cat: Dict[str, int] = {}
+        per_source: Dict[str, int] = {"turners": 0, "manheim": 0}
+        # Turners — one fetch per category
         for cat in categories:
             events = await fetch_turners_auctions(cat)
-            per_cat[cat] = len(events)
+            per_cat[cat] = per_cat.get(cat, 0) + len(events)
+            per_source["turners"] += len(events)
             total += len(events)
             for ev in events:
                 doc = ev.to_doc()
                 await self.db.auto_auction_calendar.update_one(
-                    {"key": doc["key"]},
-                    {"$set": doc},
-                    upsert=True,
+                    {"key": doc["key"]}, {"$set": doc}, upsert=True,
                 )
-        return {"fetched": total, "by_category": per_cat, "at": datetime.utcnow().isoformat()}
+        # Manheim — single endpoint returns all categories
+        manheim_events = await fetch_manheim_auctions()
+        for ev in manheim_events:
+            if ev.category in categories:
+                per_cat[ev.category] = per_cat.get(ev.category, 0) + 1
+                per_source["manheim"] += 1
+                total += 1
+                doc = ev.to_doc()
+                await self.db.auto_auction_calendar.update_one(
+                    {"key": doc["key"]}, {"$set": doc}, upsert=True,
+                )
+        return {
+            "fetched": total,
+            "by_category": per_cat,
+            "by_source": per_source,
+            "at": datetime.utcnow().isoformat(),
+        }
 
     async def list_events(
         self,

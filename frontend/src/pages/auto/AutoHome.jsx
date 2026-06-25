@@ -49,7 +49,7 @@ const BRANCH_IMAGES = {
   "Уонгареи":              "https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=900&auto=format&fit=crop",
   "Норт-Шор":              "https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=900&auto=format&fit=crop",
   "Окленд":                "https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=900&auto=format&fit=crop",
-  "Отахуху":               "https://images.unsplash.com/photo-1597007030739-6d2e7172ee6c?q=80&w=900&auto=format&fit=crop",
+  "Отахуху":               "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=900&auto=format&fit=crop",
   "Гамильтон":             "https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=900&auto=format&fit=crop",
   "Гамильтон (Avalon Drive)":"https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=900&auto=format&fit=crop",
   "Гамильтон (Te Rapa)":   "https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=900&auto=format&fit=crop",
@@ -62,8 +62,8 @@ const BRANCH_IMAGES = {
   "Веллингтон":            "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=900&auto=format&fit=crop",
   "Нельсон":               "https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=900&auto=format&fit=crop",
   "Бленем":                "https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=900&auto=format&fit=crop",
-  "Крайстчёрч":            "https://images.unsplash.com/photo-1597007030739-6d2e7172ee6c?q=80&w=900&auto=format&fit=crop",
-  "Крайстчёрч (Hornby)":   "https://images.unsplash.com/photo-1597007030739-6d2e7172ee6c?q=80&w=900&auto=format&fit=crop",
+  "Крайстчёрч":            "https://images.unsplash.com/photo-1591293836027-e05b48473b67?q=80&w=900&auto=format&fit=crop",
+  "Крайстчёрч (Hornby)":   "https://images.unsplash.com/photo-1591293836027-e05b48473b67?q=80&w=900&auto=format&fit=crop",
   "Тимару":                "https://images.unsplash.com/photo-1591293836027-e05b48473b67?q=80&w=900&auto=format&fit=crop",
   "Данидин":               "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=900&auto=format&fit=crop",
   "Инверкаргилл":          "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=900&auto=format&fit=crop",
@@ -84,7 +84,7 @@ function imageForBranch(branchOrCity) {
 
 const AUCTION_IMAGES = [
   "https://images.unsplash.com/photo-1554744512-d6c603f27c54?q=80&w=900&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1597007030739-6d2e7172ee6c?q=80&w=900&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=900&auto=format&fit=crop",
   "https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=900&auto=format&fit=crop",
   "https://images.unsplash.com/photo-1542362567-b07e54358753?q=80&w=900&auto=format&fit=crop",
 ];

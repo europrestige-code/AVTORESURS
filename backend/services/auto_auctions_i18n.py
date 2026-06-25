@@ -38,6 +38,11 @@ BRANCH_RU = {
     "timaru": "Тимару",
     "dunedin": "Данидин",
     "invercargill": "Инверкаргилл",
+    # Manheim sites
+    "takanini":   "Такини (Окленд)",
+    "wiri":       "Вири (Окленд)",
+    "rolleston":  "Роллестон (Крайстчёрч)",
+    "national":   "Национальный",
 }
 
 CITY_RU = {

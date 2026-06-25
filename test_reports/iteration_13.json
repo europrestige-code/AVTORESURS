@@ -1,0 +1,32 @@
+{
+  "summary": "Iter13 — Otahuhu visual fix + Manheim calendar integration verified end-to-end. Backend 2/2 pytest GREEN: /api/auto/admin/auctions/refresh returns by_source={turners:98, manheim:10}; /api/auto/auctions/calendar?days_ahead=21 exposes 10 manheim events with Russian-localised cities (Окленд, Веллингтон) — Окленд branch label is 'Такини (Окленд)'. Frontend regression: 0 broken images on /auto homepage; Otahuhu card now renders photo-1494976388531-d1058494cdd8 (naturalWidth=900). Header overflow check passes at 1280/1366/1440/1920 — Регистрация button right edge always <= viewport width, nav text «Календарь» present.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter13_manheim_otahuhu.py",
+    "/app/test_reports/pytest/iter13.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AutoHome.jsx — BRANCH_IMAGES still relies entirely on Unsplash hot-linking. Today's Otahuhu 404 is fixed, but any of the other 18 photo-IDs can be deleted upstream the same way (Unsplash periodically takes down photos). Consider (a) self-hosting a small set of branch hero JPGs in /public/branding/ as you already do for damaged-porsche.jpg / eol-prado.webp, or (b) adding an onError fallback on the <img> that swaps in FALLBACK_BRANCH_IMG so a future deletion never produces a blank card again.",
+    "BRANCH_IMAGES has several duplicate photo IDs across cities (e.g. photo-1591293836027 used for Крайстчёрч, Крайстчёрч (Hornby) and Тимару; photo-1542362567 for Гамильтон×3 + hero). Not a bug, but the homepage looks repetitive when multiple southern branches sit in the same carousel.",
+    "services/auto_auctions_service.py — fetch_manheim_auctions returned only 10 lots in this test run vs Turners' 98. If Manheim NZ blocks the upstream HTTP call from the preview egress IP the by_source.manheim count will silently drop to 0 and the refresh endpoint still returns 200; recommend logging a warning when by_source[<src>] == 0 so we notice degradation without a failing test."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter13_manheim_otahuhu.py (NEW — 2 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (2/2 iter13)", "frontend": "100% on requested flows"},
+  "test_credentials": "admin@buyanywhere.com / admin12345",
+  "seed_data_creation": "None. Tests are read-only except for the admin refresh which only repopulates auction caches.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Verified iter13 assertions: (1) GET /auto homepage — Array.from(document.images).filter(i=>i.complete&&i.naturalWidth===0).length === 0; Отахуху card <img> src=photo-1494976388531-d1058494cdd8, naturalWidth=900. (2) POST /api/auto/admin/auctions/refresh (admin bearer) returns {fetched, by_category:{cars,damaged,trucks}, by_source:{turners,manheim}, at} with both source counts > 0 (98 / 10 in this run). (3) GET /api/auto/auctions/calendar?days_ahead=21 returns {events,by_day,count}; events include source='manheim' with city='Окленд' (branch label 'Такини (Окленд)') and 'Веллингтон'. (4) Header: nav-register testid bounding-rect right edge is 1256/1342/1416/1736 px at viewports 1280/1366/1440/1920 — fully visible at every tested breakpoint. Nav text «Календарь» (short form) confirmed present in the top nav; the long form «Календарь аукционов» also exists but lives in the footer, which is fine.",
+  "rca of the issue": "Bug RCA: the Otahuhu card image 404'd because the Unsplash photo ID photo-1597007030739-6d2e7172ee6c was deleted upstream. Main agent's fix in AutoHome.jsx swaps in photo-1494976388531-d1058494cdd8 for Отахуху and photo-1591293836027-e05b48473b67 for Крайстчёрч/Hornby, and removes the dead ID from the AUCTION_IMAGES rotation. Verified: page now has 0 broken images and Отахуху <img>.naturalWidth = 900. To prevent regression for other branches, consider self-hosting branch photos or adding an onError fallback to FALLBACK_BRANCH_IMG (see code-review comment #1)."
+}
