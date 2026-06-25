@@ -17,6 +17,10 @@ import {
 } from "lucide-react";
 import autoApi from "../../services/autoApi";
 import BodyTypeStrip from "../../components/auto/BodyTypeStrip";
+import LiveMarketStrip from "../../components/auto/LiveMarketStrip";
+import DepositExplainer from "../../components/auto/DepositExplainer";
+import EndingSoonCarousel from "../../components/auto/EndingSoonCarousel";
+import LeadModal from "../../components/auto/LeadModal";
 import { getFxRate, formatRub } from "../../services/autoCurrency";
 
 /* ==========================================================================
@@ -215,9 +219,13 @@ export default function AutoHome() {
       <Hero onView={() => navigate("/auto/catalog")} />
       <SearchPanel total={totals.total} onSubmit={() => navigate("/auto/catalog")} />
 
+      <LiveMarketStrip />
+
       <section className="mx-auto max-w-7xl px-6 pt-6" data-testid="body-type-strip-section">
         <BodyTypeStrip />
       </section>
+
+      <EndingSoonCarousel />
 
       <HotDaily />
 
@@ -227,6 +235,8 @@ export default function AutoHome() {
         <PopularCategories />
         <LeadCapture />
       </section>
+
+      <DepositExplainer />
 
       <BottomStrip />
     </main>

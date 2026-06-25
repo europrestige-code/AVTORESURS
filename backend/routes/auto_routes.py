@@ -79,6 +79,11 @@ async def get_auto_service(db=Depends(get_db)) -> AutoService:
     return AutoService(db)
 
 
+async def get_engagement_service(db=Depends(get_db)):
+    from services.auto_engagement_service import AutoEngagementService
+    return AutoEngagementService(db)
+
+
 _ai_service = AutoAIService()
 
 
@@ -693,6 +698,123 @@ async def body_type_counts(svc: AutoService = Depends(get_auto_service)):
     from services.auto_body_types import counts_by_canonical
     items = await counts_by_canonical(svc.db)
     return {"items": items, "total": sum(i["count"] for i in items)}
+
+
+# ===== Engagement: interests + offers + market summary =====
+
+from models.auto_engagement import AutoInterestCreate, AutoOfferCreate
+
+
+@router.post("/interests")
+async def create_interest(
+    payload: AutoInterestCreate,
+    user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+    eng=Depends(get_engagement_service),
+):
+    """Anyone (visitor or authed) can express interest. Used by the lead
+    modal and the "Выразить интерес" CTA on the vehicle page."""
+    if not payload.name or not payload.phone:
+        raise HTTPException(400, "Укажите имя и телефон.")
+    return await eng.create_interest(payload, user_id=user.get("id") if user else None)
+
+
+@router.post("/offers")
+async def create_offer(
+    payload: AutoOfferCreate,
+    user: Dict[str, Any] = Depends(require_user),
+    eng=Depends(get_engagement_service),
+):
+    """Authed user posts a non-binding *Предложение цены*. Does NOT require
+    a deposit. Stored separately from `auto_bids` to keep the legal/UX
+    distinction (offer = soft, bid = binding instruction)."""
+    if not payload.offer_price_nzd or payload.offer_price_nzd <= 0:
+        raise HTTPException(400, "Сумма предложения должна быть положительной.")
+    return await eng.create_offer(payload, user_id=user["id"])
+
+
+@router.get("/my/offers")
+async def list_my_offers(
+    user: Dict[str, Any] = Depends(require_user),
+    eng=Depends(get_engagement_service),
+):
+    return {"items": await eng.my_offers(user["id"])}
+
+
+@router.get("/vehicles/{vehicle_id}/engagement")
+async def vehicle_engagement(vehicle_id: str, eng=Depends(get_engagement_service)):
+    counts = await eng.engagement_counts(vehicle_id)
+    return counts.dict()
+
+
+@router.get("/market-summary")
+async def market_summary(eng=Depends(get_engagement_service)):
+    """Live numbers for the homepage strip — total available, ending soon,
+    damaged, buy-now, leads in the last 24h. Cheap aggregate, OK to call
+    on every page load."""
+    return await eng.market_summary()
+
+
+@router.get("/ending-soon")
+async def vehicles_ending_soon(
+    limit: int = 8,
+    eng=Depends(get_engagement_service),
+):
+    from services.auto_fx_service import get_fx_rate
+    items = await eng.ending_soon(limit=limit)
+    fx = await get_fx_rate()
+    return {"items": items, "fx_rate": fx}
+
+
+# ----- Admin: interests + offers management -----
+
+@router.get("/admin/interests")
+async def admin_list_interests(
+    status: Optional[str] = None,
+    limit: int = 100,
+    _: Dict[str, Any] = Depends(require_admin),
+    eng=Depends(get_engagement_service),
+):
+    return {"items": await eng.list_interests(status=status, limit=limit)}
+
+
+@router.patch("/admin/interests/{interest_id}/status")
+async def admin_update_interest(
+    interest_id: str,
+    payload: Dict[str, Any],
+    _: Dict[str, Any] = Depends(require_admin),
+    eng=Depends(get_engagement_service),
+):
+    res = await eng.update_interest_status(interest_id, payload.get("status", ""))
+    if not res:
+        raise HTTPException(404, "Лид не найден или статус неверный.")
+    return res
+
+
+@router.get("/admin/offers")
+async def admin_list_offers(
+    status: Optional[str] = None,
+    limit: int = 100,
+    _: Dict[str, Any] = Depends(require_admin),
+    eng=Depends(get_engagement_service),
+):
+    return {"items": await eng.list_offers(status=status, limit=limit)}
+
+
+@router.patch("/admin/offers/{offer_id}/status")
+async def admin_update_offer(
+    offer_id: str,
+    payload: Dict[str, Any],
+    _: Dict[str, Any] = Depends(require_admin),
+    eng=Depends(get_engagement_service),
+):
+    res = await eng.update_offer_status(
+        offer_id,
+        payload.get("status", ""),
+        admin_response=payload.get("admin_response"),
+    )
+    if not res:
+        raise HTTPException(404, "Предложение не найдено или статус неверный.")
+    return res
 
 
 @router.get("/catalog-summary")

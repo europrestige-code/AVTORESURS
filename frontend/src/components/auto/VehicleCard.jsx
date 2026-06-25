@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Calculator } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
 import LandedPriceModal from "./LandedPriceModal";
+import LeadModal from "./LeadModal";
 import { getFxRate, formatRub } from "../../services/autoCurrency";
 
 const STATUS_BADGE = {
@@ -42,6 +43,7 @@ function fmtDate(v) {
 
 export default function VehicleCard({ vehicle }) {
   const [landedOpen, setLandedOpen] = useState(false);
+  const [leadOpen, setLeadOpen] = useState(false);
   const [, setFx] = useState(null);
   useEffect(() => { getFxRate().then(setFx); }, []);
   const status = STATUS_BADGE[vehicle.status] || { cls: "", text: vehicle.status };
@@ -103,6 +105,15 @@ export default function VehicleCard({ vehicle }) {
           >
             Подробнее
           </Link>
+          <button
+            type="button"
+            className="auto-btn auto-btn--ghost vehicle-card__landed"
+            onClick={(e) => { e.preventDefault(); setLeadOpen(true); }}
+            data-testid={`vehicle-interest-btn-${vehicle.id}`}
+            title="Оставить контакт — мы свяжемся и расскажем условия"
+          >
+            Интересно
+          </button>
           {vehicle.current_price_nzd > 0 && (
             <button
               type="button"
@@ -123,6 +134,14 @@ export default function VehicleCard({ vehicle }) {
         onClose={() => setLandedOpen(false)}
         vehicleId={vehicle.id}
         fallbackFobNzd={vehicle.current_price_nzd || vehicle.buy_now_price_nzd}
+      />
+      <LeadModal
+        open={leadOpen}
+        onClose={() => setLeadOpen(false)}
+        vehicle={vehicle}
+        source="vehicle_card"
+        title="Оставить заявку"
+        subtitle="Расскажем подробнее об автомобиле и пришлём расчёт."
       />
     </article>
   );

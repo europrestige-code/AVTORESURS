@@ -1,0 +1,39 @@
+{
+  "summary": "Iter9 — three-stage engagement (Interest → Offer → Bid) regression: BACKEND 15/15 pytest GREEN; FRONTEND all 3 panels + all 3 modals + admin Leads tab fully verified end-to-end on the production preview URL. Visitor /auto/vehicle/{id} shows engagement-panel-visitor with cta-express-interest / cta-register / cta-request-quote; opening lead-modal, filling name+phone+city+budget and submitting renders lead-modal-success (POST /api/auto/interests succeeded). Authed client2@buyanywhere.com (no deposit) sees engagement-panel-no-deposit with cta-make-offer + cta-deposit, NO cta-submit-bid; offer-modal submit returned no error. Authed client@buyanywhere.com (verified) sees engagement-panel-verified with cta-submit-bid → bid-modal opens. AU/inquiry branch (cta-make-offer-au) compiled in EngagementPanel.jsx and renders for country=AU or inquiry_only lots — not exercised because the picked NZ vehicle did not match that branch (per-spec, exclusive branches). Admin: admin-tab-leads + leads-sub-interests + leads-sub-offers all present; 10 interest-status dropdowns + 3 offer-status dropdowns rendered; PATCH offer 2b40ec1… status=countered persisted (UI reflects new value). LiveMarketStrip on /auto: 6 market-stat-* cards. deposit-explainer + body-type-strip-section + urgency-widget + price-guidance + pg-disclaimer all rendering. VehicleCard 'Интересно' button: 12/12 cards on /auto/catalog (testid=vehicle-interest-btn-<id>) — clicking opens lead-modal correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auto/interests (anon, empty body)", "issue": "Returns 422 (Pydantic) when name+phone omitted entirely; only returns explicit 400 when fields are present-but-empty strings. Test accepts both. Spec says 'required (400 if missing)'. Behaviour is consistent and validated, just slightly different status code for the missing-field case."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter9_engagement.py",
+    "/app/test_reports/pytest/iter9.xml"
+  ],
+  "action_items": [
+    "(carry-over, not blocking MVP) HotDaily tiles on /auto homepage use inline JSX instead of VehicleCard — therefore no vehicle-interest-btn-* there. By design; spec is satisfied via /auto/catalog where 12/12 cards expose the button. Consider unifying onto VehicleCard post-MVP for a single secondary-CTA story.",
+    "(minor backend polish) POST /api/auto/interests — when an entirely-empty JSON body is sent, FastAPI/Pydantic returns 422 before the explicit 400. Add a 400-emitting body validator if you want the public API to be strict-400 for both missing and empty cases.",
+    "(carry-over from iter8) auto_routes.py is 1673 lines — refactor into sub-routers post-MVP."
+  ],
+  "critical_code_review_comments": [
+    "AutoEngagementService.create_interest uses payload.dict() — pydantic v2 deprecates .dict() in favour of .model_dump(); harmless today, fixes a future-version warning.",
+    "AutoEngagementService.market_summary 'damaged' counts on damage_type {$nin:[None,''], $exists:true} but seed data also uses condition='Повреждённое' as the canonical damaged flag (see catalog-summary). The two counts can drift. Consider unifying or documenting which is authoritative.",
+    "EngagementPanel.jsx duplicates the offer-modal and bid-modal inline (≈360 lines total). Extracting them into separate files would mirror LeadModal.jsx and reduce re-render churn when the panel state changes.",
+    "auto_engagement_service._mirror_to_crm catches ALL exceptions silently — fine for best-effort, but log a WARN so a broken CRM bridge doesn't go unnoticed in prod."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter9_engagement.py (NEW — 15 pytest cases covering interests/offers/bids gate/market-summary/ending-soon/admin)"
+  ],
+  "success_rate": {"backend": "100% (15/15 pytest)", "frontend": "100% — visitor / no-deposit / verified panels + lead/offer/bid modals + admin Leads tab with status PATCH all working"},
+  "test_credentials": "admin@buyanywhere.com / admin12345; client@buyanywhere.com / client12345 (verified deposit); client2@buyanywhere.com / client12345 (no deposit)",
+  "seed_data_creation": "Created via tests: 3 TEST_ interests (phone +79139999999 used twice to exercise the CRM-existing-contact branch, +79991112233 for the authed JWT case, +79991110099 from the UI submit), 2 TEST_ offers (12345 NZD soft_offer, then transitioned through countered→accepted→declined→expired; 9999 NZD from UI client2 flow), 1 live bid placed by client@buyanywhere.com on an active NZ auction lot. All clearly TEST_-prefixed in name; phones use the +79… range.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter9 is GREEN for MVP launch of the three-stage engagement flow. New endpoints under /api/auto verified: POST /interests (anon + authed, mirrors to db.contacts), POST /offers (auth required, positive amount), GET /my/offers, POST /vehicles/{id}/bid (deposit gate enforced — client2 blocked, client allowed), GET /vehicles/{id}/engagement (counts), GET /market-summary (6 ints), GET /ending-soon?limit=8 ({items,fx_rate}), GET/PATCH /admin/interests, GET/PATCH /admin/offers. Frontend testids confirmed on production preview URL: engagement-panel-{visitor,no-deposit,verified,au-inquiry}, cta-{express-interest,register,request-quote,make-offer,deposit,submit-bid,make-offer-au}, lead-modal + lead-{name,phone,email,city,budget,message}-input + lead-submit-btn + lead-modal-success, offer-modal + offer-price-input + offer-submit-btn, bid-modal + bid-amount-input + bid-submit-btn, live-market-strip (6 stat cards), deposit-explainer, body-type-strip-section, urgency-widget, price-guidance, pg-disclaimer, admin-tab-leads + leads-sub-{interests,offers} + interest-status-{id} + offer-status-{id}. Auth response field is access_token (NOT token). REACT_APP_BACKEND_URL = https://auto-nz-bidding.preview.emergentagent.com. Open carry-overs (NON-blocking for MVP): HotDaily tiles on /auto homepage are inline (no VehicleCard, hence no vehicle-interest-btn on homepage — design choice); auto_routes.py size; damaged-vehicle non-runner default from iter5.",
+  "rca of the issue": "N/A — no new bugs found. The single pytest failure during the first run was a test-script bug (NoneType + int when current_price_nzd was null on a picked vehicle) and was fixed by using `(current_price_nzd or buy_now_price_nzd or 1000) + 500`. All 15 tests pass after the fix."
+}

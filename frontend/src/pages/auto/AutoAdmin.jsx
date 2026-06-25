@@ -3,9 +3,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import autoApi from "../../services/autoApi";
 import { fmtPrice } from "../../components/auto/VehicleCard";
 
-const TABS = ["vehicles", "bids", "deposits", "sources", "import", "branding", "auctions", "invoices", "logistics", "crm", "clients", "campaigns", "settings"];
+const TABS = ["vehicles", "leads", "bids", "deposits", "sources", "import", "branding", "auctions", "invoices", "logistics", "crm", "clients", "campaigns", "settings"];
 const TAB_LABEL = {
   vehicles: "Автомобили",
+  leads: "Лиды",
   bids: "Ставки",
   deposits: "Депозиты",
   sources: "Источники",
@@ -62,6 +63,176 @@ export default function AutoAdmin() {
       {tab === "clients" && <ClientsTab />}
       {tab === "campaigns" && <CampaignsTab />}
       {tab === "settings" && <SettingsTab />}
+      {tab === "leads" && <LeadsTab />}
+    </div>
+  );
+}
+
+/* ===== Leads tab: interests + offers ===== */
+function LeadsTab() {
+  const [sub, setSub] = useState("interests");
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {[
+          ["interests", "Заявки (Interests)"],
+          ["offers", "Предложения цены"],
+        ].map(([k, lbl]) => (
+          <button
+            key={k}
+            onClick={() => setSub(k)}
+            className={`auto-btn ${sub === k ? "" : "auto-btn-outline"}`}
+            data-testid={`leads-sub-${k}`}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+      {sub === "interests" ? <InterestsList /> : <OffersList />}
+    </div>
+  );
+}
+
+function InterestsList() {
+  const [items, setItems] = useState([]);
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    try {
+      const r = await autoApi.get(`/admin/interests${status ? `?status=${status}` : ""}`);
+      setItems(r.data?.items || []);
+    } finally {
+      setBusy(false);
+    }
+  }, [status]);
+  useEffect(() => { load(); }, [load]);
+
+  const setItemStatus = async (id, s) => {
+    await autoApi.patch(`/admin/interests/${id}/status`, { status: s });
+    load();
+  };
+
+  return (
+    <div className="auto-card" data-testid="leads-interests">
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        {["", "new", "contacted", "qualified", "closed"].map((s) => (
+          <button
+            key={s || "all"}
+            className={`auto-btn ${status === s ? "" : "auto-btn-outline"}`}
+            onClick={() => setStatus(s)}
+            data-testid={`leads-interests-filter-${s || "all"}`}
+          >
+            {s || "Все"}
+          </button>
+        ))}
+        <button className="auto-btn auto-btn-outline" onClick={load}>↻</button>
+      </div>
+      {busy && <div className="auto-muted">Загружаем…</div>}
+      {!busy && items.length === 0 && <div className="auto-muted">Пока пусто.</div>}
+      <table className="auto-table" style={{ width: "100%", marginTop: 8 }}>
+        <thead>
+          <tr><th>Дата</th><th>Имя</th><th>Телефон</th><th>Город</th><th>Бюджет NZ$</th><th>Источник</th><th>Статус</th><th></th></tr>
+        </thead>
+        <tbody>
+          {items.map((it) => (
+            <tr key={it.id} data-testid={`interest-row-${it.id}`}>
+              <td style={{ fontSize: 12, opacity: 0.7 }}>{new Date(it.created_at).toLocaleString("ru-RU")}</td>
+              <td>{it.name}</td>
+              <td><a href={`tel:${it.phone}`}>{it.phone}</a></td>
+              <td>{it.city || "—"}</td>
+              <td>{it.budget_nzd ? fmtPrice(it.budget_nzd) : "—"}</td>
+              <td><span className="auto-badge">{it.source}</span></td>
+              <td>
+                <select
+                  value={it.status}
+                  onChange={(e) => setItemStatus(it.id, e.target.value)}
+                  className="auto-input"
+                  style={{ padding: "4px 8px" }}
+                  data-testid={`interest-status-${it.id}`}
+                >
+                  {["new", "contacted", "qualified", "closed"].map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </td>
+              <td style={{ maxWidth: 240, fontSize: 12, opacity: 0.8 }}>{it.message || ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function OffersList() {
+  const [items, setItems] = useState([]);
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    try {
+      const r = await autoApi.get(`/admin/offers${status ? `?status=${status}` : ""}`);
+      setItems(r.data?.items || []);
+    } finally {
+      setBusy(false);
+    }
+  }, [status]);
+  useEffect(() => { load(); }, [load]);
+
+  const setItemStatus = async (id, s) => {
+    await autoApi.patch(`/admin/offers/${id}/status`, { status: s });
+    load();
+  };
+
+  return (
+    <div className="auto-card" data-testid="leads-offers">
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        {["", "soft_offer", "countered", "accepted", "declined", "expired"].map((s) => (
+          <button
+            key={s || "all"}
+            className={`auto-btn ${status === s ? "" : "auto-btn-outline"}`}
+            onClick={() => setStatus(s)}
+            data-testid={`leads-offers-filter-${s || "all"}`}
+          >
+            {s || "Все"}
+          </button>
+        ))}
+        <button className="auto-btn auto-btn-outline" onClick={load}>↻</button>
+      </div>
+      {busy && <div className="auto-muted">Загружаем…</div>}
+      {!busy && items.length === 0 && <div className="auto-muted">Пока пусто.</div>}
+      <table className="auto-table" style={{ width: "100%", marginTop: 8 }}>
+        <thead>
+          <tr><th>Дата</th><th>Авто</th><th>Пользователь</th><th>Предложение NZ$</th><th>Статус</th><th>Сообщение</th></tr>
+        </thead>
+        <tbody>
+          {items.map((it) => (
+            <tr key={it.id} data-testid={`offer-row-${it.id}`}>
+              <td style={{ fontSize: 12, opacity: 0.7 }}>{new Date(it.created_at).toLocaleString("ru-RU")}</td>
+              <td><a href={`/auto/vehicle/${it.vehicle_id}`}>{it.vehicle_id?.slice(0, 8)}…</a></td>
+              <td style={{ fontSize: 12 }}>{it.user_id?.slice(0, 8)}…</td>
+              <td>{fmtPrice(it.offer_price_nzd)}</td>
+              <td>
+                <select
+                  value={it.status}
+                  onChange={(e) => setItemStatus(it.id, e.target.value)}
+                  className="auto-input"
+                  style={{ padding: "4px 8px" }}
+                  data-testid={`offer-status-${it.id}`}
+                >
+                  {["soft_offer", "countered", "accepted", "declined", "expired"].map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </td>
+              <td style={{ maxWidth: 320, fontSize: 12, opacity: 0.85 }}>{it.message || ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

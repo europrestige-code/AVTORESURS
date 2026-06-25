@@ -2,7 +2,9 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import autoApi from "../../services/autoApi";
 import { useAuth } from "../../contexts/AuthContext";
-import BidPanel from "../../components/auto/BidPanel";
+import EngagementPanel from "../../components/auto/EngagementPanel";
+import UrgencyWidget from "../../components/auto/UrgencyWidget";
+import PriceGuidance from "../../components/auto/PriceGuidance";
 import PriceBreakdown from "../../components/auto/PriceBreakdown";
 import CountdownTimer from "../../components/auto/CountdownTimer";
 import SimilarLots from "../../components/auto/SimilarLots";
@@ -200,15 +202,18 @@ export default function AutoVehicleDetail() {
             </button>
           </div>
 
-          {!isInquiryOnly && (
-            <BidPanel
-              vehicle={vehicle}
-              depositVerified={depositVerified}
-              isAuthenticated={isAuthenticated}
-              onPlaced={() => load()}
-            />
-          )}
+          <UrgencyWidget vehicle={vehicle} />
+          <PriceGuidance vehicle={vehicle} />
 
+          <EngagementPanel
+            vehicle={vehicle}
+            depositVerified={depositVerified}
+            isAuthenticated={isAuthenticated}
+            user={user}
+            onPlaced={() => load()}
+          />
+
+          {/* Legacy inquiry textarea retained only for the rare custom-message flow */}
           {isInquiryOnly && (
             <div className="auto-card" data-testid="inquiry-panel">
               <div style={{ fontWeight: 600, marginBottom: 8 }}>
