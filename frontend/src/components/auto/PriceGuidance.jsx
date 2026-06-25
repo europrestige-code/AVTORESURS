@@ -1,5 +1,5 @@
 import React from "react";
-import { formatRub, fmtRubAmount } from "../../services/autoCurrency";
+import { formatRub, fmtRubAmount, rubWithNzd } from "../../services/autoCurrency";
 import { fmtPrice } from "./VehicleCard";
 
 /* Price guidance block — three transparent values + disclaimer.

@@ -55,6 +55,18 @@ export function nzdToRub(nzd, rate) {
   return Number(nzd) * Number(rate || _cache?.nzd_to_rub_display || 57.68);
 }
 
+/**
+ * Format an NZD amount as RUB first with NZD$ in brackets — used by all
+ * customer-facing pricing tiles per the brand rule ("everything in roubles").
+ */
+export function rubWithNzd(nzd, { fallback = "—" } = {}) {
+  const v = Number(nzd);
+  if (!Number.isFinite(v) || v <= 0) return fallback;
+  const rub = formatRub(v);
+  const nzdStr = `NZ$${Math.round(v).toLocaleString("en-NZ")}`;
+  return `${rub}  (${nzdStr})`;
+}
+
 export function fmtRubAmount(rub, { fallback = "—" } = {}) {
   if (rub == null || isNaN(rub)) return fallback;
   return `${Math.round(rub).toLocaleString("ru-RU")} ₽`;
