@@ -1,0 +1,39 @@
+{
+  "summary": "Iter16 tiered payment-terms verified end-to-end. BACKEND 6/6 GREEN — (1) GET /api/auto/payment-terms returns {version='v2026.06.25.2', base_deposit_nzd=1000, tier1_threshold_nzd=20000, tier1_percent=20, tier2_threshold_nzd=40000, tier2_percent=30, full_payment_window_hours=24, bullets_ru=[5 Russian bullets]}. (2) GET /vehicles/1f49c4c5-.../deposit-required → tier='tier1', percent=20, amount_nzd≈4900 (price 24500 × 20%). (3) Cheap NZ lot (≤NZ$20K, id=129ff37c-...) → tier='base', amount=1000, is_percent=false. (4) Helper required_deposit_nzd({current_price_nzd:55000}) → tier='tier2', percent=30, amount=16500 (validated in-process since no live >40K vehicle in catalog). (5) GET /vehicles/garbage-id/deposit-required → 404. (6) POST /vehicles/{nz-tier1-id}/bid as client@buyanywhere.com (1K verified) → 403 with required amount in body. FRONTEND 2/2 GREEN — /auto/vehicle/1f49c4c5-... renders PaymentTermsBanner (data-testid=payment-terms-banner) between PriceGuidance(Y=470) and EngagementPanel(Y=1392) (bannerY=1014); all 4 sub-sections present (deposit-base mentions NZ$20,000, tier1 mentions 20%, tier2 mentions 30%+NZ$40,000, window mentions 24 часов); per-vehicle highlight payment-terms-this-vehicle-tier1 shows «Для этого лота — NZ$4,900». Base-tier lot 129ff37c-... renders all 4 sections but per-vehicle tier1/tier2 highlights are absent (correct). REGRESSION 2/2 GREEN — /auto/catalog «Найдено: 1602» (≥1000 ✅), /auto/auctions has 58 data-testid=auction-link-* anchors all internal (/auto/auctions/event/...), 0 external hrefs, 0 target=_blank (iter14 fix intact).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auto/vehicles/1f49c4c5-4f6a-44d8-a1fa-d6ff43579a88/bid", "issue": "Spec example used the Hilux SR5 to exercise the 403 deposit-gate, but in current seed data this vehicle is country=AU + listing_type=inquiry_only — so place_bid() rejects with HTTP 400 ('Ставки доступны только для автомобилей из Новой Зеландии.') BEFORE the deposit gate runs. The deposit gate itself works correctly when tested against an NZ auction tier1 vehicle (verified). Recommend either re-seeding the Hilux as country=NZ + listing_type=auction for demo realism, or updating future spec examples to point at an NZ auction lot."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter16_payment_terms.py",
+    "/app/test_reports/pytest/iter16.xml"
+  ],
+  "action_items": [
+    "Consider re-seeding the demo Hilux SR5 (1f49c4c5-4f6a-44d8-a1fa-d6ff43579a88) to country=NZ + listing_type=auction so the bid-deposit gate can be demoed on it as the spec described — currently the country=AU + inquiry_only flags trip the pre-deposit guards first.",
+    "Optional: surface payment_terms_summary().version in the admin settings page so changes to the disclosure can be audited."
+  ],
+  "critical_code_review_comments": [
+    "services/auto_service.py place_bid — ordering of validation guards: country/listing_type/status checks run BEFORE the deposit-amount check. That is correct defence-in-depth, but it means any test that wants to exercise the 403 deposit-gate must first pick a country=NZ + listing_type=auction + status=available vehicle. Worth documenting in the docstring.",
+    "services/auto_payment_terms.py — reference_price_nzd() falls back to ai_estimate.recommended_max_bid_nzd when current_price_nzd is zero. This can silently push a $0-priced fresh-import into tier1/tier2 if the AI estimator returns a high number. Consider gating the AI-estimate fallback behind a 'has_real_price' flag, or at least logging when AI is used to derive deposit tier.",
+    "routes/auto_routes.py /vehicles/{id}/deposit-required — exposes user_meets_requirement and user_verified_amount_nzd to any authenticated user. For privacy, double-check the docstring spec; currently OK because it only echoes the caller's own balance, but worth a quick review to confirm no leakage of other users' deposit state.",
+    "PaymentTermsBanner.jsx — calls autoApi.get('/payment-terms') on every mount of the vehicle detail page with no client-side cache; for a static disclosure block this is wasteful. Recommend memoising the response in a React context or localStorage with a short TTL."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter16_payment_terms.py (NEW — 6 pytest cases covering payment-terms summary, per-vehicle deposit-required tier0/1/2, 404 on garbage id, bid 403 enforcement)",
+    "/app/test_reports/pytest/iter16.xml (NEW)"
+  ],
+  "success_rate": {"backend": "100% (6/6 iter16 pytest)", "frontend": "100% (tier1 banner on Hilux + base-tier banner on portable building + auctions+catalog regression)"},
+  "test_credentials": "admin@buyanywhere.com / admin12345, client@buyanywhere.com / client12345 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. Tier2 path was validated by calling services.auto_payment_terms.required_deposit_nzd({current_price_nzd:55000}) directly in the test — no DB write needed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter16 payment-terms contract is GREEN. (1) /api/auto/payment-terms public disclosure returns the right tunables and 5 Russian bullets. (2) /api/auto/vehicles/{id}/deposit-required correctly tiers base/tier1/tier2 and returns 404 on garbage. (3) Bid deposit gate enforced — client@buyanywhere.com (NZ$1,000 verified) cannot bid on NZ auction tier1 lots (gets 403 with required amount in body). (4) Frontend PaymentTermsBanner renders between PriceGuidance and EngagementPanel on /auto/vehicle/:id with all 4 testid sub-sections, and the per-vehicle highlight correctly only appears for the matching tier. (5) Regressions intact: /auto/catalog 'Найдено: 1602' (>=1000), /auto/auctions 58 internal data-testid=auction-link-* links with 0 external/_blank (iter14 fix intact). MINOR: the spec example Hilux (1f49c4c5-...) is country=AU + listing_type=inquiry_only in seed, so testing the 403 deposit-gate on it actually returns 400 ('Ставки доступны только для автомобилей из Новой Зеландии.') first — the test file switches to an NZ auction tier1 vehicle picked at runtime, which proves the gate works.",
+  "rca of the issue": "N/A — no bug to RCA. One spec/seed discrepancy noted: the Hilux SR5 1f49c4c5-... is seeded as country=AU + listing_type=inquiry_only, so POST /bid on it hits the NZ-only/auction-only guards (HTTP 400) BEFORE the 403 deposit-gate runs. The deposit-gate itself was verified against a runtime-picked NZ auction tier1 lot. Mitigation if exact spec adherence is required: re-seed the Hilux as country=NZ + listing_type=auction (a one-line MongoDB update on auto_vehicles)."
+}

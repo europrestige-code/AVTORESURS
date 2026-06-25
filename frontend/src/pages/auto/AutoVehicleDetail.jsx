@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import EngagementPanel from "../../components/auto/EngagementPanel";
 import UrgencyWidget from "../../components/auto/UrgencyWidget";
 import PriceGuidance from "../../components/auto/PriceGuidance";
+import PaymentTermsBanner from "../../components/auto/PaymentTermsBanner";
 import PriceBreakdown from "../../components/auto/PriceBreakdown";
 import CountdownTimer from "../../components/auto/CountdownTimer";
 import SimilarLots from "../../components/auto/SimilarLots";
@@ -22,11 +23,16 @@ export default function AutoVehicleDetail() {
   const [inquiry, setInquiry] = useState({ message: "", phone: "", telegram: "" });
   const [inquiryStatus, setInquiryStatus] = useState(null);
   const [watching, setWatching] = useState(false);
+  const [vehicleDeposit, setVehicleDeposit] = useState(null);
 
   const load = useCallback(async () => {
     try {
       const r = await autoApi.get(`/vehicles/${id}`);
       setVehicle(r.data);
+      try {
+        const dep = await autoApi.get(`/vehicles/${id}/deposit-required`);
+        setVehicleDeposit(dep.data);
+      } catch { /* anonymous-friendly fallback */ }
     } catch (e) {
       setError(e.response?.data?.detail || "Не удалось загрузить.");
     }
@@ -204,6 +210,10 @@ export default function AutoVehicleDetail() {
 
           <UrgencyWidget vehicle={vehicle} />
           <PriceGuidance vehicle={vehicle} />
+          <PaymentTermsBanner
+            compact
+            vehicleDeposit={vehicleDeposit?.required}
+          />
 
           <EngagementPanel
             vehicle={vehicle}

@@ -996,6 +996,42 @@ async def admin_refund_deposit(
 # moved to routes/auto/admin_crm.py. -----
 
 
+@router.get("/payment-terms")
+async def payment_terms_public():
+    """Static disclosure of the payment policy (deposit floor, 30% rule for
+    NZ$10K+ lots, 24-hour full-payment window). Used by the frontend banner
+    and the public Terms page."""
+    from services.auto_payment_terms import payment_terms_summary
+    return payment_terms_summary()
+
+
+@router.get("/vehicles/{vehicle_id}/deposit-required")
+async def vehicle_deposit_required(
+    vehicle_id: str,
+    user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+    db=Depends(get_db),
+):
+    """Per-vehicle deposit calculation that the bid CTA uses to decide
+    whether to show «Внести депозит» or «Сделать ставку». Returns the
+    required amount, the breakdown, and (for logged-in users) the amount
+    already on file so the UI can render a delta."""
+    from services.auto_payment_terms import required_deposit_nzd
+    vehicle = await db.auto_vehicles.find_one({"id": vehicle_id}, {"_id": 0})
+    if not vehicle:
+        raise HTTPException(404, "Автомобиль не найден.")
+    required = required_deposit_nzd(vehicle)
+    verified_amount = 0.0
+    if user:
+        svc = AutoService(db)
+        verified_amount = await svc._verified_deposit_amount(user["id"])
+    return {
+        "vehicle_id": vehicle_id,
+        "required": required,
+        "user_verified_amount_nzd": verified_amount,
+        "user_meets_requirement": verified_amount + 0.01 >= required["amount_nzd"],
+    }
+
+
 @router.get("/catalog-summary")
 async def catalog_summary(
     body_type: Optional[str] = None,

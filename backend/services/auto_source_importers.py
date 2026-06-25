@@ -271,9 +271,22 @@ class TurnersImporter(SourceImporter):
             text = _norm(a.get_text(" ", strip=True))
             if not text or len(text) < 8:
                 continue
+            # Reject landing/aggregator pages and CTA tiles (iter15 cleanup).
+            low = text.lower().strip()
+            if low in {
+                "view stock", "find a car", "discounted cars",
+                "buy now", "buy a car", "bid now", "sell my car",
+                "view auction", "auctions", "view all stock",
+            }:
+                continue
+            if any(p in low for p in ("view stock", "find a car", "discounted cars", "view all")):
+                continue
             ref_m = re.search(r"/(\d{4,})(?:/|$)", full)
             year_m = YEAR_RE.search(text)
             price_m = PRICE_RE.search(text)
+            # A real lot must have at least a 4-digit year and a stock id.
+            if not year_m or not ref_m:
+                continue
             seen.add(full)
             results.append({
                 "source_url": full,

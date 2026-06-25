@@ -439,6 +439,21 @@ class AutoService:
                 "Для участия в торгах требуется подтверждённый депозит NZ$1,000.",
             )
 
+        # Expensive-lot deposit rule (≥ NZ$10K → 30% deposit).
+        from services.auto_payment_terms import required_deposit_nzd
+        req = required_deposit_nzd(vehicle)
+        if req["amount_nzd"] > 0:
+            verified_amount = await self._verified_deposit_amount(user_id)
+            if verified_amount + 0.01 < req["amount_nzd"]:
+                raise HTTPException(
+                    403,
+                    (
+                        f"Для ставки на этот лот требуется депозит "
+                        f"NZ${req['amount_nzd']:,.0f} ({req['explanation']}). "
+                        f"Сейчас подтверждено: NZ${verified_amount:,.0f}."
+                    ),
+                )
+
         highest = await self.get_highest_bid(vehicle_id)
         if max_bid_nzd == highest.highest_bid_nzd:
             raise HTTPException(
@@ -496,6 +511,16 @@ class AutoService:
             {"user_id": user_id, "status": AutoDepositStatus.VERIFIED.value}
         )
         return doc is not None
+
+    async def _verified_deposit_amount(self, user_id: str) -> float:
+        """Sum of all VERIFIED deposit amounts for the user (used by the
+        expensive-lot deposit rule)."""
+        total = 0.0
+        async for d in self.db.auto_deposits.find(
+            {"user_id": user_id, "status": AutoDepositStatus.VERIFIED.value}
+        ):
+            total += float(d.get("amount_nzd") or 0)
+        return total
 
     async def latest_deposit(self, user_id: str) -> Optional[Dict[str, Any]]:
         doc = await self.db.auto_deposits.find_one(
