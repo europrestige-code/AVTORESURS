@@ -31,13 +31,13 @@ export default function AutoLayout() {
 
       {/* Sticky main header — sits below the contact marquee. */}
       <header className="sticky top-[28px] z-40 border-b border-white/10 bg-[var(--ar-black)]">
-        <div className="mx-auto flex max-w-screen-2xl items-end justify-between gap-6 px-6 py-4">
+        <div className="mx-auto flex max-w-screen-2xl items-end justify-between gap-6 px-6 py-2">
           <NavLink to="/auto" end className="flex items-center" data-testid="auto-brand">
             <img
               src="/branding/avtoresurs-lockup.png?v=3"
               alt="АвтоРесурс — автомобили со всего мира"
-              className="h-20 w-auto select-none lg:h-24"
-              style={{ minWidth: 320 }}
+              className="h-12 w-auto select-none lg:h-14"
+              style={{ minWidth: 200 }}
               draggable="false"
             />
           </NavLink>
