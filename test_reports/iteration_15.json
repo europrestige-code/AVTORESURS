@@ -1,0 +1,43 @@
+{
+  "summary": "Iter15 bulk-mirror verified end-to-end. BACKEND 7/7 GREEN — POST /api/auto/admin/sources/import-all {limit:50} returns 200 in <5s with {ok:true, job_id (12-hex), status:'running'}; GET /api/auto/admin/sources/import-status polls to status='done' within ~10s with per_source=[turners, manheim, pickles], each carrying fetched/created/updated/skipped fields (turners fetched=50 created=2, manheim fetched=50 created=0 skipped=50, pickles fetched=30 — all 3 importers responsive); GET /api/auto/admin/sources/import-status?job_id=<id> returns the matching job. GET /api/auto/catalog-summary → total=1610 (>=1000 ✅). GET /api/auto/vehicles?source=manheim&limit=50 returns 50 manheim items, source=turners returns 50 turners items (>=20 each ✅). Regression — /api/auto/auctions/calendar?days_ahead=21 still surfaces both turners AND manheim events. FRONTEND 3/3 GREEN — /auto/catalog header reads «Найдено: 1610» and renders 12 vehicle cards (data-testid=vehicle-card-*) > 8. /auto/auctions exposes 58 data-testid=auction-link-* anchors with internal hrefs (/auto/auctions/event/<id>), 0 external turners.co.nz/manheim.co.nz links, 0 target=_blank; clicking the first link keeps the visitor on emergentagent.com (no off-site redirect — iter14 fix still holds). /auto/damaged renders 2 vehicle cards (>=1 ✅).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auto/admin/sources/import-all", "issue": "When limit=50 (small), manheim/pickles report created=0 because every fetched item is already in DB (skipped=50). Spec acceptance criterion allows created>=0, so this passes — but for a fresh test run the per_source.created counters can all be 0 and only fetched>0 proves the importers worked."},
+      {"endpoint": "/api/auto/admin/sources/import-status", "issue": "No documented TTL/cleanup for auto_import_jobs collection. Each /import-all call appends a new doc; long-term this grows unbounded. Recommend a TTL index or capped collection."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AutoCatalog vehicle cards", "issue": "Catalog contains pseudo-vehicle entries titled 'View stock', 'Find a Car', 'Discounted Cars' with empty year/price fields. These are Turners landing-page navigation links that the importer treated as lots. They inflate the «Найдено: 1610» count without being real cars and degrade UX trust.", "selector": "[data-testid^='vehicle-card-']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter15_bulk_mirror.py",
+    "/app/test_reports/pytest/iter15.xml"
+  ],
+  "action_items": [
+    "TurnersImporter.fetch_vehicles is picking up Turners landing/aggregator URLs (e.g. /cars/find-a-car, /cars/view-stock, /cars/discounted-cars) and normalising them into auto_vehicles. Add a guard that rejects any raw item whose source_reference / detail URL is one of those index pages, or that has no make+model+year. This will clean up the 'pseudo-vehicle' cards visible on /auto/catalog.",
+    "Add a TTL/cap on the new auto_import_jobs collection (e.g. expireAfterSeconds=7d) so /import-all calls don't accumulate forever.",
+    "Optional UX: surface total_created / total_fetched per source in the admin dashboard so the user can spot when an importer is silently returning zero new lots."
+  ],
+  "critical_code_review_comments": [
+    "routes/auto_routes.py — admin_sources_import_all creates an asyncio.create_task that survives the request scope but is not tracked anywhere. If the FastAPI worker is recycled mid-import, the job row will stay 'running' forever (no resumption logic, no heartbeat). Consider persisting a 'last_heartbeat' on auto_import_jobs and adding a startup sweep that marks orphaned 'running' jobs as 'error'.",
+    "routes/auto_routes.py — _run_one swallows individual normalise() errors but ImportResult.errors caps each message at 200 chars and is unbounded in count. A single broken page can balloon the doc; cap the errors list at e.g. last 25 entries.",
+    "services/auto_source_importers.py (TurnersImporter) — by scanning all 24 branches + damaged + trucks indexes when limit>100, the importer is also picking up index/aggregator pages as 'vehicles' (see HIGH UI bug). normalise() must validate that a raw item has at least a year OR make+model before turning it into an AutoVehicle.",
+    "Backend admin endpoints use require_admin which relies on users.role=='admin'. /admin/sources/import-all does NOT rate-limit; an authed admin could fire dozens of concurrent imports and exhaust the event loop. Add a simple 'one running job at a time' check on auto_import_jobs."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter15_bulk_mirror.py (NEW — 7 pytest cases covering import-all/status, catalog-summary>=1000, source filters, calendar regression)",
+    "/app/test_reports/pytest/iter15.xml (NEW)"
+  ],
+  "success_rate": {"backend": "100% (7/7 iter15 pytest)", "frontend": "100% on all 3 requested flows (catalog count, auctions click stays internal, damaged renders)"},
+  "test_credentials": "admin@buyanywhere.com / admin12345 (from /app/memory/test_credentials.md) — used for import-all + import-status endpoints",
+  "seed_data_creation": "None new. DB already at 1610 vehicles before this test run from main-agent's earlier bulk import. The iter15 pytest call to /import-all {limit:50} added only 2 new turners lots (created=2) because the rest were skipped as duplicates.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter15 contract verified: (1) POST /api/auto/admin/sources/import-all returns within ~1s with {ok:true, job_id, status:'running'}. (2) GET /api/auto/admin/sources/import-status reaches status='done' in <30s with per_source listing all 3 importers (turners/manheim/pickles). (3) catalog-summary.total = 1610, source=manheim filter returns 50 items all source=manheim, source=turners filter returns 50 items all source=turners. (4) /auto/auctions still has 58 internal data-testid=auction-link-* anchors, 0 external turners.co.nz/manheim.co.nz hrefs, click stays on emergentagent.com — iter14 redirect fix is intact. (5) /auto/damaged shows 2 cards. (6) HIGH PRIORITY UX BUG TO FIX: /auto/catalog contains pseudo-vehicle cards titled 'View stock', 'Find a Car', 'Discounted Cars' because TurnersImporter is scraping landing-page navigation links — the importer's normalise() needs a make/model/year guard.",
+  "rca of the issue": "No bug to RCA — iter15 features all pass. Pre-existing data-quality concern surfaced: TurnersImporter (after iter15's 'scan all 24 branches' expansion) is also picking up Turners aggregator pages like https://www.turners.co.nz/cars/find-a-car, /cars/view-stock and /cars/discounted-cars as vehicles. These get into auto_vehicles with empty year/price and inflate catalog-summary.total. Mitigation: in services/auto_source_importers.py TurnersImporter.normalise (or the index-scan parser), reject raw items where the title matches /^(view stock|find a car|discounted cars|browse|buy)/i or where year and make+model are all missing."
+}

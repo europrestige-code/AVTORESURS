@@ -209,17 +209,33 @@ class TurnersImporter(SourceImporter):
         auction_urls: List[str] = []
         if self.db is not None:
             try:
+                # Pull as many upcoming Turners auctions as we can — we want
+                # the full mirror, not just the top-20.
                 async for ev in self.db.auto_auction_calendar.find(
                     {"source": "turners"}
-                ).sort("starts_at", 1).limit(20):
+                ).sort("starts_at", 1).limit(200):
                     if ev.get("auction_url"):
                         auction_urls.append(ev["auction_url"])
             except Exception:
                 pass
-        # Strategy 2: fall back to branch index pages if no calendar data
-        if not auction_urls:
-            from services.auto_auctions_service import TURNERS_BRANCH_URLS
-            auction_urls = list(TURNERS_BRANCH_URLS)[:6]
+        # Strategy 2: also walk the branch index pages — this is what unlocks
+        # the rest of the stock when a calendar entry's lots aren't paginated.
+        from services.auto_auctions_service import (
+            TURNERS_BRANCH_URLS,
+            TURNERS_DAMAGED_URL,
+            TURNERS_TRUCKS_URL,
+        )
+        # When the caller wants more than 100 items, scan ALL branches + the
+        # damaged/trucks indexes. For small previews we keep the cheap 6-branch
+        # cap so admin "scan" still feels snappy.
+        if limit > 100:
+            branch_pool = list(TURNERS_BRANCH_URLS) + [TURNERS_DAMAGED_URL, TURNERS_TRUCKS_URL]
+        else:
+            branch_pool = list(TURNERS_BRANCH_URLS)[:6]
+        # Dedup-merge into auction_urls preserving calendar-first order.
+        for u in branch_pool:
+            if u not in auction_urls:
+                auction_urls.append(u)
         for url in auction_urls:
             if len(items) >= limit:
                 break
@@ -287,6 +303,7 @@ class ManheimImporter(SourceImporter):
     SEARCH_PAGES = [
         ("/passenger-vehicles/search", AutoListingType.AUCTION, None),
         ("/damaged-vehicles/search",   AutoListingType.AUCTION, "damaged"),
+        ("/trucks-machinery/search",   AutoListingType.AUCTION, None),
     ]
 
     # 2016 Nissan Leaf Hatch  →  year=2016 make=Nissan model="Leaf Hatch"
@@ -297,13 +314,26 @@ class ManheimImporter(SourceImporter):
     async def fetch_vehicles(self, limit: int = 20) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
         seen: set = set()
+        # Paginate each category until we hit the user-requested ceiling
+        # or the page returns 0 new items (= we've consumed the catalogue).
         for path, ltype, damage_hint in self.SEARCH_PAGES:
             if len(results) >= limit:
                 break
-            html = await self._get(f"{self.base_url}{path}")
-            if not html:
-                continue
-            results.extend(self._parse_search(html, ltype, damage_hint, seen, limit - len(results)))
+            for page in range(1, 51):  # safety stop at 50 pages × ~24 cards
+                if len(results) >= limit:
+                    break
+                sep = "&" if "?" in path else "?"
+                url = f"{self.base_url}{path}{sep}page={page}"
+                html = await self._get(url)
+                if not html:
+                    break
+                before = len(results)
+                results.extend(
+                    self._parse_search(html, ltype, damage_hint, seen, limit - len(results))
+                )
+                # Stop paginating this category when the page yields no new card.
+                if len(results) == before:
+                    break
         return results[:limit]
 
     def _parse_search(self, html: str, ltype: AutoListingType,
@@ -401,10 +431,19 @@ class PicklesImporter(SourceImporter):
         for path in self.SEARCH_PAGES:
             if len(results) >= limit:
                 break
-            html = await self._get(f"{self.base_url}{path}")
-            if not html:
-                continue
-            results.extend(self._parse_search(html, seen, limit - len(results)))
+            # Paginate up to 50 pages per search; stop on empty page.
+            for page in range(1, 51):
+                if len(results) >= limit:
+                    break
+                sep = "&" if "?" in path else "?"
+                url = f"{self.base_url}{path}{sep}page={page}"
+                html = await self._get(url)
+                if not html:
+                    break
+                before = len(results)
+                results.extend(self._parse_search(html, seen, limit - len(results)))
+                if len(results) == before:
+                    break
         return results[:limit]
 
     def _parse_search(self, html: str, seen: set, remaining: int) -> List[Dict[str, Any]]:

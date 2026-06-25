@@ -560,6 +560,130 @@ async def admin_sources_import(
     return res.to_dict()
 
 
+@router.post("/admin/sources/import-all")
+async def admin_sources_import_all(
+    payload: Optional[Dict[str, Any]] = Body(None),
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+    ai: AutoAIService = Depends(get_ai_service),
+):
+    """One-shot bulk mirror: pull EVERY listing we can from Turners, Manheim
+    and Pickles. Runs in the background so the request returns immediately
+    with a job_id; poll `/admin/sources/import-status` to follow progress.
+
+    Body (all optional): {limit: 2000, skip_duplicates: true, sources: [..]}
+    """
+    from services.auto_source_importers import IMPORTERS, find_duplicate, ImportResult
+    from models.auto import AutoSyncStatus
+    from datetime import datetime as _dt
+    import asyncio, uuid
+
+    payload = payload or {}
+    per_src_limit = int(payload.get("limit") or 2000)
+    skip_dups = bool(payload.get("skip_duplicates", True))
+    requested = payload.get("sources") or list(IMPORTERS.keys())
+    job_id = uuid.uuid4().hex[:12]
+
+    await db.auto_import_jobs.insert_one({
+        "job_id": job_id,
+        "status": "running",
+        "started_at": _dt.utcnow(),
+        "limit": per_src_limit,
+        "sources": requested,
+        "per_source": [],
+        "total_created": 0,
+        "total_updated": 0,
+        "total_fetched": 0,
+    })
+
+    async def _run_one(src: str) -> Dict[str, Any]:
+        cls = IMPORTERS[src]
+        try:
+            importer = cls(ai=ai, db=db)
+        except TypeError:
+            importer = cls(ai=ai)
+        res = ImportResult(importer=src)
+        try:
+            raw_items = await importer.fetch_vehicles(limit=per_src_limit)
+        except Exception as e:
+            res.errors.append(str(e))
+            res.sync_status = AutoSyncStatus.FAILED
+            res.finished_at = _dt.utcnow()
+            await db.auto_import_runs.insert_one(res.to_dict())
+            return res.to_dict()
+        res.fetched = len(raw_items)
+        for raw in raw_items:
+            try:
+                vehicle = importer.normalise(raw)
+                existing = await find_duplicate(db, vehicle)
+                doc = vehicle.model_dump()
+                if existing:
+                    if skip_dups:
+                        res.skipped += 1
+                        continue
+                    doc.pop("id", None); doc.pop("created_at", None)
+                    doc["updated_at"] = _dt.utcnow()
+                    doc["last_sync_time"] = _dt.utcnow()
+                    await db.auto_vehicles.update_one({"id": existing["id"]}, {"$set": doc})
+                    res.updated += 1
+                else:
+                    await db.auto_vehicles.insert_one(doc)
+                    res.created += 1
+            except Exception as e:
+                res.failed += 1
+                res.errors.append(str(e)[:200])
+        res.finished_at = _dt.utcnow()
+        if res.failed and (res.created + res.updated == 0):
+            res.sync_status = AutoSyncStatus.FAILED
+        elif res.failed:
+            res.sync_status = AutoSyncStatus.PARTIAL
+        await db.auto_import_runs.insert_one(res.to_dict())
+        return res.to_dict()
+
+    async def _runner():
+        try:
+            results = await asyncio.gather(*[_run_one(s) for s in requested if s in IMPORTERS])
+            await db.auto_import_jobs.update_one(
+                {"job_id": job_id},
+                {"$set": {
+                    "status": "done",
+                    "finished_at": _dt.utcnow(),
+                    "per_source": results,
+                    "total_created": sum(r.get("created", 0) for r in results),
+                    "total_updated": sum(r.get("updated", 0) for r in results),
+                    "total_fetched": sum(r.get("fetched", 0) for r in results),
+                }},
+            )
+        except Exception as e:
+            await db.auto_import_jobs.update_one(
+                {"job_id": job_id},
+                {"$set": {"status": "error", "error": str(e)[:300],
+                          "finished_at": _dt.utcnow()}},
+            )
+
+    asyncio.create_task(_runner())
+    return {"ok": True, "job_id": job_id, "status": "running"}
+
+
+@router.get("/admin/sources/import-status")
+async def admin_sources_import_status(
+    job_id: Optional[str] = None,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Return the latest import job, or a specific one if `job_id` given."""
+    q = {"job_id": job_id} if job_id else {}
+    doc = await db.auto_import_jobs.find_one(q, sort=[("started_at", -1)])
+    if not doc:
+        return {"status": "none"}
+    doc.pop("_id", None)
+    for k in ("started_at", "finished_at"):
+        v = doc.get(k)
+        if hasattr(v, "isoformat"):
+            doc[k] = v.isoformat()
+    return doc
+
+
 @router.get("/admin/sources/runs")
 async def admin_sources_runs(
     _: Dict[str, Any] = Depends(require_admin),
