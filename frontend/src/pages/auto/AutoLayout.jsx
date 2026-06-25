@@ -22,15 +22,15 @@ export default function AutoLayout() {
   const { isAuthenticated, user, logout } = useAuth();
   return (
     <div className="auto-root min-h-screen bg-[var(--ar-black)] text-white" data-testid="auto-root">
-      {/* Top contact bar */}
-      <div className="border-b border-white/5 bg-[var(--ar-black)]">
-        <div className="mx-auto flex max-w-7xl items-center justify-end gap-4 px-6 py-1.5 text-xs">
-          <ContactsBar variant="header" />
-        </div>
+      {/* Sliding contact marquee — sticky, full-width, opaque dark bg.
+       *  Sits ABOVE the main brand+nav header so the AR lockup is never
+       *  overlapped or visually affected. */}
+      <div className="sticky top-0 z-[60]">
+        <ContactsBar variant="header" />
       </div>
 
-      {/* Sticky main header */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--ar-black)]/85 backdrop-blur-xl">
+      {/* Sticky main header — sits below the contact marquee. */}
+      <header className="sticky top-[28px] z-40 border-b border-white/10 bg-[var(--ar-black)]">
         <div className="mx-auto flex max-w-screen-2xl items-end justify-between gap-6 px-6 py-4">
           <NavLink to="/auto" end className="flex items-center" data-testid="auto-brand">
             <img

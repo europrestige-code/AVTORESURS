@@ -863,9 +863,24 @@ async def admin_update_offer(
 
 
 @router.get("/catalog-summary")
-async def catalog_summary(svc: AutoService = Depends(get_auto_service)):
-    """Counts for the catalog hero (Turners-style): total + by body_type + by listing_type + makes."""
+async def catalog_summary(
+    body_type: Optional[str] = None,
+    svc: AutoService = Depends(get_auto_service),
+):
+    """Counts for the catalog hero (Turners-style): total + by body_type + by listing_type + makes.
+
+    `body_type` (optional) — when set, scopes makes/models/countries to a single
+    canonical vertical (sedan, suv, motorcycle, truck, machinery, …). Used by
+    the Motorcycles/Trucks/Machinery category pages so their Make/Model
+    dropdowns show ONLY the makes that exist in that vertical (e.g. no
+    Mitsubishi Lancer when on Motorcycles).
+    """
     base = {"status": {"$ne": AutoVehicleStatus.HIDDEN.value}}
+    if body_type:
+        from services.auto_body_types import mongo_filter_for_key
+        mf = mongo_filter_for_key(body_type)
+        if mf:
+            base = {**base, "body_type": mf}
     total = await svc.db.auto_vehicles.count_documents(base)
 
     async def _bucket(field: str, limit: int = 50):

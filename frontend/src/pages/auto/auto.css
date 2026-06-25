@@ -67,6 +67,45 @@
   letter-spacing: -0.01em;
 }
 
+/* ---------------- Sliding contacts marquee (header) ---------------- */
+.ar-contacts-marquee {
+  /* Solid background — never transparent. Sits in its own sticky row
+   * above the main brand/nav header so the AR logo is never overlapped. */
+  background: var(--ar-black);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  position: relative;
+  z-index: 50;
+}
+.ar-contacts-marquee__track {
+  display: flex;
+  width: max-content;
+  animation: ar-marquee 38s linear infinite;
+  will-change: transform;
+}
+.ar-contacts-marquee:hover .ar-contacts-marquee__track {
+  animation-play-state: paused;
+}
+.ar-contacts-marquee__chunk {
+  display: inline-flex;
+  align-items: center;
+  gap: 36px;
+  padding: 6px 28px;
+  font-size: 12px;
+  color: #d4d4d8;
+  white-space: nowrap;
+}
+.ar-contacts-marquee__chunk a { color: inherit; }
+.ar-contacts-marquee__chunk a:hover { color: #fff; }
+
+@keyframes ar-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ar-contacts-marquee__track { animation: none; }
+}
+
 .auto-root a {
   color: var(--auto-text);
 }

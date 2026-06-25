@@ -1,15 +1,19 @@
 import React from "react";
 import { Phone, MessageCircle, Send, Mail, MapPin, Clock } from "lucide-react";
 
-const PHONE_NZ = "+64 21 425 233";
+const PHONE_NZ = "+64 210 809 4550";
 const PHONE_RU = "+7 913 512 1934";
 const EMAIL = "europrestige@gmail.com";
 const WHATSAPP_URL = "https://wa.me/6421425233";
+const WHATSAPP_LABEL = "WhatsApp +64 21 425 233";
 const TELEGRAM_URL = "https://t.me/avtoresurs";
 
 /**
- * ContactsBar — thin top bar with phones, email, messengers, office, hours.
- * Two variants: header (small inline) and footer (block).
+ * ContactsBar — sliding contact strip that always sits at the top of the
+ * site. Two variants:
+ *   • header  → animated marquee track (CSS keyframes) on a solid dark
+ *               background — never transparent, never overlapping the logo.
+ *   • footer  → static block grid for the footer.
  */
 export default function ContactsBar({ variant = "header" }) {
   if (variant === "footer") {
@@ -18,22 +22,35 @@ export default function ContactsBar({ variant = "header" }) {
         <Item icon={Phone} label="NZ" value={PHONE_NZ} href={`tel:${PHONE_NZ.replace(/\s/g, "")}`} />
         <Item icon={Phone} label="RU" value={PHONE_RU} href={`tel:${PHONE_RU.replace(/\s/g, "")}`} />
         <Item icon={Mail} value={EMAIL} href={`mailto:${EMAIL}`} />
-        <Item icon={MessageCircle} value="WhatsApp" href={WHATSAPP_URL} accent="#25D366" />
+        <Item icon={MessageCircle} value={WHATSAPP_LABEL} href={WHATSAPP_URL} accent="#25D366" />
         <Item icon={Send} value="Telegram" href={TELEGRAM_URL} accent="#229ED9" />
         <Item icon={MapPin} value="Auckland, New Zealand" />
         <Item icon={Clock} value="Пн–Пт 9:00–18:00 NZDT" />
       </div>
     );
   }
-  // header — single line, compact, hidden on mobile
+
+  // header — repeating marquee track so the bar visibly slides
+  const items = [
+    { icon: Phone,          text: PHONE_NZ,          href: `tel:${PHONE_NZ.replace(/\s/g, "")}` },
+    { icon: MessageCircle,  text: WHATSAPP_LABEL,    href: WHATSAPP_URL,                       accent: "#25D366" },
+    { icon: Send,           text: "Telegram",        href: TELEGRAM_URL,                       accent: "#229ED9" },
+    { icon: Mail,           text: EMAIL,             href: `mailto:${EMAIL}` },
+    { icon: MapPin,         text: "Auckland, NZ" },
+    { icon: Clock,          text: "Пн–Пт 9–18 NZDT" },
+  ];
+  // Render twice in the same track so the slide loop is seamless.
   return (
-    <div className="hidden flex-wrap items-center justify-end gap-x-5 gap-y-1 text-[11px] text-gray-300 md:flex" data-testid="contacts-header">
-      <Inline icon={Phone} text={PHONE_NZ} href={`tel:${PHONE_NZ.replace(/\s/g, "")}`} />
-      <Inline icon={MessageCircle} text="WhatsApp" href={WHATSAPP_URL} accent="#25D366" />
-      <Inline icon={Send} text="Telegram" href={TELEGRAM_URL} accent="#229ED9" />
-      <Inline icon={Mail} text={EMAIL} href={`mailto:${EMAIL}`} />
-      <Inline icon={MapPin} text="Auckland, NZ" />
-      <Inline icon={Clock} text="Пн–Пт 9–18 NZDT" />
+    <div className="ar-contacts-marquee" data-testid="contacts-header">
+      <div className="ar-contacts-marquee__track" aria-hidden={false}>
+        {[0, 1].map((dup) => (
+          <div key={dup} className="ar-contacts-marquee__chunk">
+            {items.map((it, i) => (
+              <Inline key={`${dup}-${i}`} {...it} />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -45,7 +62,9 @@ function Inline({ icon: Icon, text, href, accent }) {
       <span>{text}</span>
     </span>
   );
-  return href ? <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{inner}</a> : inner;
+  return href ? (
+    <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{inner}</a>
+  ) : inner;
 }
 
 function Item({ icon: Icon, label, value, href, accent }) {
