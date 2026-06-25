@@ -11,7 +11,7 @@ import { getFxRate } from "../../services/autoCurrency";
  *
  * Make / Model are cascading dropdowns sourced from /api/auto/makes.
  */
-export default function VehicleFilters({ value, onChange, onApply }) {
+export default function VehicleFilters({ value, onChange, onApply, scopeBodyType = null }) {
   const [local, setLocal] = useState(value || {});
   const [fx, setFx] = useState(null);
   const [makes, setMakes] = useState([]);
@@ -19,8 +19,9 @@ export default function VehicleFilters({ value, onChange, onApply }) {
   useEffect(() => setLocal(value || {}), [value]);
   useEffect(() => { getFxRate().then(setFx); }, []);
   useEffect(() => {
-    autoApi.get("/makes").then((r) => setMakes(r.data?.items || [])).catch(() => {});
-  }, []);
+    const q = scopeBodyType ? `?body_type=${encodeURIComponent(scopeBodyType)}` : "";
+    autoApi.get(`/makes${q}`).then((r) => setMakes(r.data?.items || [])).catch(() => {});
+  }, [scopeBodyType]);
 
   const rate = fx?.nzd_to_rub_display || 57.68;
 

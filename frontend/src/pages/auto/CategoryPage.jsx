@@ -76,6 +76,7 @@ export default function CategoryPage({ category }) {
               setOffset(0);
               setExtra(next);
             }}
+            scopeBodyType={category.apiFilters?.body_type || null}
           />
           {category.tips && (
             <div className="auto-card" style={{ marginTop: 14 }}>

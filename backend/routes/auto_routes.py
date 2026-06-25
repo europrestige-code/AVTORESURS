@@ -1619,15 +1619,26 @@ async def public_unsubscribe(
 
 @router.get("/makes")
 async def list_makes_and_models(
+    body_type: Optional[str] = None,
     svc: AutoService = Depends(get_auto_service),
 ):
     """Return every distinct make + its models (with counts) from the catalog.
 
-    Powers cascading Make → Model dropdowns in filters and the homepage
-    SearchPanel. Excludes nulls. Sorted by count DESC then alphabetically.
+    `body_type` (optional canonical key — sedan/suv/motorcycle/truck/machinery/…)
+    scopes the result to a single vertical so the Motorcycles page only sees
+    motorcycle makes (Honda, Yamaha, Suzuki) — never Toyota Camry.
+
+    Excludes nulls. Sorted by count DESC then alphabetically.
     """
+    match: Dict[str, Any] = {"make": {"$ne": None, "$exists": True}}
+    if body_type:
+        from services.auto_body_types import mongo_filter_for_key
+        mf = mongo_filter_for_key(body_type)
+        if mf:
+            match["body_type"] = mf
+
     pipeline = [
-        {"$match": {"make": {"$ne": None, "$exists": True}}},
+        {"$match": match},
         {"$group": {
             "_id": {"make": "$make", "model": "$model"},
             "count": {"$sum": 1},
