@@ -89,6 +89,16 @@ import, AI translation/chat, automated email marketing, dark premium UI.
   light-commercial vans, sold-history needs seed observations for the
   `sold_observations` branch regression.
 
+## Done in iter20 (27.06.2026) — van whitelist
+- **Van/Utility whitelist** — `is_non_vehicle()` now runs title checks
+  BEFORE the URL check, so legit light-commercial vans and utility trucks
+  parked under Manheim's `/trucks-machinery/` URL don't get swept:
+  Hiace, Transit, Sprinter, Vito, Crafter, Ducato, Master, Trafic,
+  Hilux, Ranger, Navara, Amarok, BT-50, Colorado, D-Max, Tacoma, F-150,
+  Amarok, Patrol, Pajero, Wrangler and more. Hard-blacklist words (portable
+  building, steel barrier, cement mixer, trailer chassis, …) still win.
+- **Backend tests iter20** — 14/14 pass, 0 critical.
+
 ## V2 backlog (post-MVP)
 - 🟡 **P1** — Market Intelligence Engine Phase 2: Playwright/WebSocket capture
   for live Simulcast prices (currently only AI-estimated).

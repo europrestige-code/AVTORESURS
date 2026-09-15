@@ -1,0 +1,22 @@
+{
+  "summary": "Iter20 title-whitelist for is_non_vehicle validated end-to-end. 14/14 tests pass: 8 whitelist cases (Hiace/Transit/Sprinter/Hilux/Ranger/Navara/Amarok/BT-50 under /trucks-machinery/) return False; blacklist-beats-whitelist (Ford Transit trailer chassis) returns True; plain non-vehicle rows under /trucks-machinery/ (Steel Barrier, Cement Mixer) still return True; passenger URL passes. Regression: POST /api/auto/admin/sources/cleanup-non-vehicles → 200 {inspected>0, deleted:0}; GET /api/auto/vehicles/{id}/sold-history → 200.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_is_non_vehicle_whitelist.py",
+    "/app/test_reports/pytest/iter20_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "is_non_vehicle precedence in services/auto_source_importers.py (lines 122-149) correctly implements: title-blacklist → title-whitelist → URL-blacklist → default vehicle. Substring match on lowercased title is safe.",
+    "Whitelist tuple _VEHICLE_TITLE_WORDS is comprehensive (vans, utes, SUVs). Case-insensitive via .lower() on title; hyphen variants covered ('bt-50','bt50','d-max','dmax','hi-ace','hiace').",
+    "Minor: 'transit' substring could false-positive on non-vehicle titles containing the word 'transit' (e.g. 'transit case'), but no such non-vehicle rows currently exist in DB (deleted:0). Not blocking."
+  ],
+  "updated_files": ["/app/backend/tests/test_is_non_vehicle_whitelist.py"],
+  "success_rate": {"backend": "100%", "frontend": "n/a"},
+  "test_credentials": "admin@buyanywhere.com / admin12345 (login returns access_token)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Predicate test module at /app/backend/tests/test_is_non_vehicle_whitelist.py imports is_non_vehicle directly and also hits /api/auto/admin/sources/cleanup-non-vehicles and /api/auto/vehicles/{id}/sold-history. Run with REACT_APP_BACKEND_URL exported. Cleanup currently reports deleted:0 on 1448-row clean DB — any regression that reintroduces non-vehicle rows will surface here."
+}

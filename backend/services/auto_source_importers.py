@@ -90,17 +90,49 @@ _NON_VEHICLE_TITLE_WORDS = (
     "pallet", "bin lifter", "auger", "post rammer",
     "trailer only", "trailer chassis",
 )
+# Vehicle-title whitelist — anything matching these tokens is treated as a
+# vehicle even if it sits under a machinery-heavy Manheim URL. Necessary
+# because /trucks-machinery/ also carries legitimate light-commercial vans
+# and pickups (Hiace, Sprinter, Transit, Hilux, Ranger, Navara, Colorado…).
+# Substring match, case-insensitive; add narrower models here as needed.
+_VEHICLE_TITLE_WORDS = (
+    # light-commercial vans
+    "hiace", "hi-ace", "regius", "regius ace", "granvia",
+    "caravan e26", "nv350", "nv200",
+    "sprinter", "transit", "custom transit", "tourneo",
+    "ducato", "boxer", "jumper", "relay", "expert", "partner",
+    "master", "trafic", "kangoo",
+    "crafter", "vito", "viano", "v-class", "vaneo", "vito tourer",
+    "iveco daily", "transporter", "caravelle", "multivan",
+    "delica", "bongo", "e-nv200", "scudo",
+    # utility / pickups & 4wd trucks
+    "hilux", "surf", "landcruiser", "land cruiser", "prado",
+    "ranger", "colorado", "d-max", "dmax", "isuzu ute",
+    "navara", "np300", "frontier",
+    "amarok", "bt-50", "bt50",
+    "tacoma", "tundra", "silverado", "f-150", "f-250", "f150", "f250",
+    "titan", "ridgeline",
+    "l200", "l 200", "triton", "strada",
+    # SUVs/wagons occasionally listed under trucks category
+    "patrol", "pajero", "montero", "trooper",
+    "wrangler", "gladiator",
+)
 
 
 def is_non_vehicle(raw_or_doc: Dict[str, Any]) -> bool:
     """Return True if this raw row / DB doc is clearly not a passenger vehicle.
 
+    Precedence:
+      1. hard blacklist keywords in the title (portable buildings, barriers,
+         mixers…) → non-vehicle, no matter what.
+      2. whitelist keywords in the title (Hiace, Transit, Sprinter, Hilux, …)
+         → vehicle, even if the URL sits under `/trucks-machinery/`.
+      3. blacklist URL segments → non-vehicle.
+      4. otherwise → vehicle.
+
     Works with both scraper output (`title`, `source_url`) and Mongo docs
     (`title_original`, `title_ru`, `source_url`).
     """
-    url = (raw_or_doc.get("source_url") or "").lower()
-    if any(h in url for h in _NON_VEHICLE_URL_HINTS):
-        return True
     title = (
         raw_or_doc.get("title")
         or raw_or_doc.get("title_original")
@@ -108,6 +140,11 @@ def is_non_vehicle(raw_or_doc: Dict[str, Any]) -> bool:
         or ""
     ).lower()
     if any(kw in title for kw in _NON_VEHICLE_TITLE_WORDS):
+        return True
+    if any(kw in title for kw in _VEHICLE_TITLE_WORDS):
+        return False
+    url = (raw_or_doc.get("source_url") or "").lower()
+    if any(h in url for h in _NON_VEHICLE_URL_HINTS):
         return True
     return False
 
