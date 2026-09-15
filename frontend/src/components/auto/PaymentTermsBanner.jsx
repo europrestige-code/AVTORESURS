@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { AlertCircle, Clock, CreditCard, Diamond } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertCircle, CreditCard, Diamond } from "lucide-react";
 import autoApi from "../../services/autoApi";
 
 const CACHE_KEY = "ar_payment_terms_v1";
@@ -94,21 +95,17 @@ export default function PaymentTermsBanner({ compact = false, vehicleDeposit = n
         </div>
       </div>
 
-      <div className="payment-terms__row">
-        <Clock size={18} className="payment-terms__icon" style={{ color: "var(--ar-danger)" }} />
-        <div>
-          <div className="payment-terms__head" data-testid="payment-terms-window">
-            Полная оплата — в течение {terms.full_payment_window_hours} часов после выигрыша
-          </div>
-          <div className="payment-terms__sub auto-muted">
-            При нарушении срока лот возвращается на аукцион, а внесённый депозит удерживается.
-          </div>
+      {!compact ? (
+        <div className="payment-terms__small auto-muted" data-testid="payment-terms-footnote">
+          Расчёт в ₽ по курсу на момент оплаты + 3% банковского спреда. Сроки оплаты
+          после выигрыша и порядок штрафов — в{" "}
+          <Link to="/auto/terms" className="payment-terms__link">условиях использования</Link>.
+          Версия: {terms.version}.
         </div>
-      </div>
-
-      {!compact && (
-        <div className="payment-terms__small auto-muted">
-          Расчёт в ₽ по курсу на момент оплаты + 3% банковского спреда. Версия условий: {terms.version}.
+      ) : (
+        <div className="payment-terms__small auto-muted" data-testid="payment-terms-footnote-compact">
+          Сроки оплаты после выигрыша и порядок штрафов —{" "}
+          <Link to="/auto/terms#terms-section-7" className="payment-terms__link">в условиях использования</Link>.
         </div>
       )}
     </div>

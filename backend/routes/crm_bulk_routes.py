@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
 from fastapi.responses import JSONResponse
 import os
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 from models.crm_bulk import BulkUploadRequest, BulkUploadResult, MARKET_SEGMENTS, INDUSTRY_CATEGORIES

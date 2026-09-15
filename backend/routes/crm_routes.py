@@ -351,31 +351,6 @@ async def send_communication(
             detail="Ошибка при отправке сообщения"
         )
 
-@router.get("/communications/{customer_id}")
-async def get_customer_communications(
-    customer_id: str,
-    limit: int = Query(50, le=200),
-    admin = Depends(get_current_admin_user),
-    crm_service: AdvancedCRMService = Depends(get_crm_service)
-):
-    """Get customer communication history (admin only)"""
-    try:
-        communications = await crm_service.get_customer_communications(customer_id, limit)
-        
-        return {
-            "success": True,
-            "data": [comm.model_dump() for comm in communications],
-            "total": len(communications),
-            "message": f"Получено {len(communications)} сообщений"
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting customer communications: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Ошибка при получении истории сообщений"
-        )
-
 @router.get("/communications/types")
 async def get_communication_types():
     """Get available communication types"""
@@ -424,6 +399,31 @@ async def get_communication_types():
         raise HTTPException(
             status_code=500,
             detail="Ошибка при получении типов коммуникаций"
+        )
+
+@router.get("/communications/{customer_id}")
+async def get_customer_communications(
+    customer_id: str,
+    limit: int = Query(50, le=200),
+    admin = Depends(get_current_admin_user),
+    crm_service: AdvancedCRMService = Depends(get_crm_service)
+):
+    """Get customer communication history (admin only)"""
+    try:
+        communications = await crm_service.get_customer_communications(customer_id, limit)
+        
+        return {
+            "success": True,
+            "data": [comm.model_dump() for comm in communications],
+            "total": len(communications),
+            "message": f"Получено {len(communications)} сообщений"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting customer communications: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Ошибка при получении истории сообщений"
         )
 
 # Automation System

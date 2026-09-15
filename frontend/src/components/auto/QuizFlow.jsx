@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import autoApi from "../../services/autoApi";
 import { formatRub } from "../../services/autoCurrency";
+import QuizSaveSearch from "./QuizSaveSearch";
 
 /**
  * AI-подборщик — multi-step quiz rendered inline inside the chat panel.
@@ -148,6 +149,7 @@ export default function QuizFlow({ onClose, onSubmitted }) {
             </Link>
           ))}
         </div>
+        <QuizSaveSearch form={form} lead={result.lead} />
         <button
           type="button"
           className="auto-btn auto-btn--ghost quiz-flow__close"

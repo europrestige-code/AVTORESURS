@@ -26,6 +26,7 @@ from models.auto import (
     AutoListingType,
     AutoLogisticsEvent,
     AutoLogisticsEventCreate,
+    AutoLogisticsStatus,
     AutoVehicle,
     AutoVehicleStatus,
     AutoWatchlistItem,
@@ -68,6 +69,74 @@ def _is_non_runner(vehicle: Dict[str, Any]) -> bool:
         "title_ru", "title_original",
     )).lower()
     return any(k in haystack for k in _NON_RUNNER_KEYWORDS)
+
+
+def _estimate_ru_landed_for_vehicle(vehicle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Approximate "Ориентир под ключ" — Vladivostok-landed price with RU
+    customs + utilsbor + freight, computed with vehicle-derived defaults.
+
+    A simpler `calculate_price_breakdown()` is **not enough** for the inline
+    «Ориентир под ключ» tile: it only sums the NZ-side fees + freight, never
+    adding the Russian customs duty / утильсбор (which can be 100k–4M ₽).
+    Without those, the displayed RUB total is grossly understated.
+
+    This helper invokes the canonical `calculate_ru_landed_cost()` with the
+    same sensible defaults the `/landed-defaults` endpoint exposes, so the
+    inline tile, the LandedPriceModal and the customs calculator stay in
+    sync.
+    """
+    fob = vehicle.get("current_price_nzd") or vehicle.get("buy_now_price_nzd")
+    if not fob or float(fob) <= 0:
+        return None
+
+    import re as _re
+    eng_txt = (vehicle.get("engine") or "").lower()
+    engine_cc = 2000  # fallback (avg 2.0L) — declared engine missing from many scrapes
+    m_cc = _re.search(r"(\d{3,4})\s*cc", eng_txt)
+    m_l = _re.search(r"(\d(?:\.\d+)?)\s*l", eng_txt)
+    if m_cc:
+        engine_cc = int(m_cc.group(1))
+    elif m_l:
+        engine_cc = int(round(float(m_l.group(1)) * 1000))
+
+    year = vehicle.get("year") or 0
+    age_years = max(0, datetime.utcnow().year - int(year)) if year else 5
+
+    from services.auto_ru_customs_service import (
+        calculate_ru_landed_cost,
+        suggest_defaults_for_listing,
+    )
+    defaults = suggest_defaults_for_listing(
+        listing_type=vehicle.get("listing_type"),
+        damage_type=vehicle.get("damage_type"),
+        condition=vehicle.get("condition"),
+    )
+    try:
+        res = calculate_ru_landed_cost(
+            fob_nzd=float(fob),
+            age_years=age_years,
+            engine_cc=engine_cc,
+            engine_hp=0,
+            importer_type="personal",
+            scheme=defaults.get("scheme", "whole"),
+            nz_branch=vehicle.get("location"),
+            is_non_runner=bool(defaults.get("is_non_runner") or _is_non_runner(vehicle)),
+            inspection=bool(defaults.get("inspection")),
+            forklift=bool(defaults.get("forklift")),
+            dismantling=bool(defaults.get("dismantling")),
+        )
+    except Exception as e:
+        logger.warning(f"landed estimate failed for vehicle {vehicle.get('id')}: {e}")
+        return None
+    return {
+        "landed_total_rub": round(res.landed_total_rub, 2),
+        "landed_total_nzd": round(res.landed_total_nzd, 2),
+        "landed_total_usd": round(res.landed_total_usd, 2),
+        "fob_nzd": round(res.fob_nzd, 2),
+        "scheme": res.scheme,
+        "assumed_engine_cc": engine_cc,
+        "assumed_age_years": age_years,
+    }
 
 
 def calculate_price_breakdown(
@@ -243,13 +312,31 @@ class AutoService:
                 ]
 
         total = await self.db.auto_vehicles.count_documents(query)
-        cursor = (
-            self.db.auto_vehicles.find(query)
-            .sort("created_at", -1)
-            .skip(max(offset, 0))
-            .limit(min(max(limit, 1), 100))
-        )
-        items = [_strip_id(v) async for v in cursor]
+        # Two-tier sort: vehicles with a current auction price surface first
+        # so the catalog's default page is never populated by price-less
+        # scrapes; within each tier we keep recency order (newest first).
+        pipeline = [
+            {"$match": query},
+            {"$addFields": {
+                "_has_price": {
+                    "$cond": [
+                        {"$gt": [{"$ifNull": ["$current_price_nzd", 0]}, 0]},
+                        1, 0,
+                    ]
+                }
+            }},
+            {"$sort": {"_has_price": -1, "created_at": -1}},
+            {"$skip": max(offset, 0)},
+            {"$limit": min(max(limit, 1), 100)},
+            {"$project": {"_has_price": 0, "_id": 0}},
+        ]
+        items = [v async for v in self.db.auto_vehicles.aggregate(pipeline)]
+        # Apply UX-clamping on the AI estimate so catalog tiles never show
+        # absurd low/high ranges that confuse customers.
+        from services.auto_intel_engine import sanitize_ai_estimate
+        for it in items:
+            if it.get("ai_estimate"):
+                it["ai_estimate"] = sanitize_ai_estimate(it, it["ai_estimate"])
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 
     async def get_vehicle(self, vehicle_id: str) -> Dict[str, Any]:
@@ -260,6 +347,11 @@ class AutoService:
         highest = await self.get_highest_bid(vehicle_id)
         doc["highest_bid_nzd"] = highest.highest_bid_nzd
         doc["bid_count"] = highest.bid_count
+        # Sanity-clamp AI estimate before the customer sees it — see
+        # auto_intel_engine.sanitize_ai_estimate for the rules.
+        if doc.get("ai_estimate"):
+            from services.auto_intel_engine import sanitize_ai_estimate
+            doc["ai_estimate"] = sanitize_ai_estimate(doc, doc["ai_estimate"])
         # Pricing breakdown preview if price known. Auto-infer transport from
         # `location` and detect non-runners by condition/damage.
         if doc.get("current_price_nzd"):
@@ -270,6 +362,9 @@ class AutoService:
                 branch_or_city=doc.get("location"),
                 is_non_runner=non_runner,
             )
+            # Full "Ориентир под ключ" — includes RU customs + utilsbor +
+            # freight, so the inline tile no longer shows just the FOB price.
+            doc["landed_estimate"] = _estimate_ru_landed_for_vehicle(doc)
         return doc
 
     async def create_vehicle(self, vehicle: AutoVehicle) -> Dict[str, Any]:

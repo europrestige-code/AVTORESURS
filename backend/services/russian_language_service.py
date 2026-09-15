@@ -132,7 +132,7 @@ class RussianLanguageProcessor:
                 amount, 'RUB', locale=self.locale, currency_digits=True
             )
             return formatted_number
-        except:
+        except Exception:
             # Fallback formatting
             return f"{amount:,.2f} ₽"
     
@@ -143,7 +143,7 @@ class RussianLanguageProcessor:
                 return format_date(dt, format='d MMMM y г.', locale=self.locale)
             else:
                 return format_date(dt, format='d MMMM', locale=self.locale)
-        except:
+        except Exception:
             # Fallback formatting
             if include_year:
                 return dt.strftime("%d.%m.%Y г.")
@@ -154,7 +154,7 @@ class RussianLanguageProcessor:
         """Format time in Russian 24-hour format"""
         try:
             return format_time(dt, format='H:mm', locale=self.locale)
-        except:
+        except Exception:
             # Fallback formatting
             return dt.strftime("%H:%M")
     
@@ -162,7 +162,7 @@ class RussianLanguageProcessor:
         """Format datetime in Russian style"""
         try:
             return format_datetime(dt, format='d MMMM y г. в H:mm', locale=self.locale)
-        except:
+        except Exception:
             # Fallback formatting
             return dt.strftime("%d.%m.%Y г. в %H:%M")
     

@@ -102,7 +102,7 @@ class CustomerPaymentService:
                         "_id": ObjectId(method_id),
                         "user_id": user_id
                     })
-                except:
+                except Exception:
                     pass
             
             if result and result.deleted_count > 0:
@@ -137,7 +137,7 @@ class CustomerPaymentService:
                         {"_id": ObjectId(method_id), "user_id": user_id},
                         {"$set": {"is_default": True, "updated_at": datetime.now(timezone.utc)}}
                     )
-                except:
+                except Exception:
                     pass
             
             if result.modified_count > 0:
@@ -213,7 +213,7 @@ class CustomerPaymentService:
                         if method_doc:
                             method_doc["id"] = str(method_doc.pop("_id"))
                             payment_method = PaymentMethod(**method_doc)
-                    except:
+                    except Exception:
                         # ObjectId conversion failed, payment method not found
                         pass
                 

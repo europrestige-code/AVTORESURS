@@ -193,7 +193,7 @@ class NewsDataIOClient(NewsAPIClient):
                 try:
                     # NewsData.io returns ISO format
                     published_at = datetime.fromisoformat(pub_date_str.replace('Z', '+00:00'))
-                except:
+                except Exception:
                     published_at = datetime.now(timezone.utc)
             else:
                 published_at = datetime.now(timezone.utc)
@@ -322,7 +322,7 @@ class NewsAPIClient_Org(NewsAPIClient):
             if pub_date_str:
                 try:
                     published_at = datetime.fromisoformat(pub_date_str.replace('Z', '+00:00'))
-                except:
+                except Exception:
                     published_at = datetime.now(timezone.utc)
             else:
                 published_at = datetime.now(timezone.utc)

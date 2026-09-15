@@ -167,3 +167,81 @@ def _safe_json(text: str) -> Optional[Dict[str, Any]]:
         return json.loads(s)
     except Exception:
         return None
+
+
+def sanitize_ai_estimate(vehicle: Dict[str, Any], ai: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Apply UX sanity-rules to a stored AI estimate.
+
+    Why?  AI estimates the *final hammer price* — but the catalog also shows
+    the *current live bid*. When the auction has just opened, the current
+    bid can be NZ$1 while the AI estimate sits at NZ$6,000.  Customers
+    misread the gap as "the site wants me to pay 5× the bid".
+
+    Rules applied (in order):
+      1. low estimate is never below the current bid (raise to current_bid).
+      2. high estimate is capped at max(current_bid×4, buy_now×1.1, low×1.5) —
+         keeps off-by-a-zero LLM glitches from showing absurd ranges.
+      3. recommended_max_bid is clamped to [current_bid×1.05, estimate_high].
+      4. We tag the auction stage so the UI can flag "торги только открылись".
+
+    Returns a fresh dict; caller should not mutate.
+    """
+    if not ai:
+        return ai
+    out = dict(ai)
+    cur = float(vehicle.get("current_price_nzd") or 0)
+    buy_now = float(vehicle.get("buy_now_price_nzd") or 0)
+
+    low = out.get("estimate_low_nzd")
+    high = out.get("estimate_high_nzd")
+    rec = out.get("recommended_max_bid_nzd")
+
+    low = float(low) if low else None
+    high = float(high) if high else None
+    rec = float(rec) if rec else None
+
+    # 1) low never below current bid (a hammer price below the live bid is impossible)
+    if low is not None and cur > 0 and low < cur:
+        low = cur
+
+    # 2) high capped vs. current bid and buy-now (kill obvious AI outliers)
+    if high is not None:
+        ceiling_candidates = []
+        if cur > 0:
+            ceiling_candidates.append(cur * 4.0)
+        if buy_now > 0:
+            ceiling_candidates.append(buy_now * 1.10)
+        if low is not None:
+            ceiling_candidates.append(low * 1.6)
+        if ceiling_candidates:
+            cap = max(ceiling_candidates)
+            if high > cap:
+                high = cap
+        # high must stay ≥ low
+        if low is not None and high < low:
+            high = low * 1.10
+
+    # 3) recommended bid sits inside [current×1.05, high]
+    if rec is not None:
+        floor = cur * 1.05 if cur > 0 else 0
+        if rec < floor:
+            rec = floor
+        if high is not None and rec > high:
+            rec = high
+
+    if low is not None:
+        out["estimate_low_nzd"] = round(low, 0)
+    if high is not None:
+        out["estimate_high_nzd"] = round(high, 0)
+    if rec is not None:
+        out["recommended_max_bid_nzd"] = round(rec, 0)
+
+    # 4) auction stage indicator
+    if cur > 0 and low and cur < low * 0.6:
+        out["auction_stage"] = "opening"  # bid much lower than expected hammer
+    elif cur > 0 and high and cur >= high * 0.95:
+        out["auction_stage"] = "peaking"
+    else:
+        out["auction_stage"] = "active"
+
+    return out

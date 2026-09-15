@@ -150,7 +150,7 @@ class CRMBulkService:
         try:
             # Try xlsx first
             return pd.read_excel(io.BytesIO(file_content), engine='openpyxl')
-        except:
+        except Exception:
             try:
                 # Try xls format
                 return pd.read_excel(io.BytesIO(file_content), engine='xlrd')

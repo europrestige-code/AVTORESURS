@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 18 backend verification: (1) landed_estimate on GET /vehicles/{id} with RU customs; (2) sanitize_ai_estimate + auction_stage on list; (3) payment terms v2026.06.27.1 with 72h window + softened bullets_ru[3]; (4) /ru-customs/calc breakdown; (5) /vehicles/{id}/landed-defaults for damaged & end_of_life; (6) /quiz/meta + /quiz/submit. Result: 7 passed, 1 skipped (no end_of_life sample in DB slice), 0 failed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/auto/vehicles/{id}/landed-defaults (end_of_life)",
+        "issue": "No end_of_life listings found in first ~1600 vehicles — test skipped, cannot verify scheme='parts' + dismantling=true in live DB. Endpoint logic itself unverified against real data; recommend spot-check via a synthetic vehicle or manual DB fixture."
+      },
+      {
+        "endpoint": "GET /api/auto/vehicles?limit=5",
+        "issue": "First 5 (and first ~500) catalog vehicles have current_price_nzd=null and no ai_estimate. Vehicles carrying prices/AI live at offset ~800+ / 1400+. Not a bug per se, but the default catalog page presented to a new visitor is entirely price-less — UX/data-completeness concern worth flagging to main agent."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter18_landed_sanity_terms.py",
+    "/app/test_reports/pytest/iter18_results.xml"
+  ],
+  "action_items": [
+    "Consider seeding a couple of end_of_life listings in the demo DB so /landed-defaults parts-scheme path can be regression-tested.",
+    "Consider surfacing priced vehicles on page 1 of the catalog (currently first several hundred entries have null prices), otherwise the fixed 'Ориентир под ключ' tile only appears deep in the list."
+  ],
+  "critical_code_review_comments": [
+    "sanitize_ai_estimate ceiling uses max(cur×4, buy_now×1.10, low×1.6) — spec/docstring in code says low×1.5 but implementation uses 1.6. Minor doc drift, harmless.",
+    "_estimate_ru_landed_for_vehicle catches broad Exception and returns None silently; consider narrower except + at least a WARNING log with vehicle context (currently only logger.warning already present — OK).",
+    "auto_payment_terms.py module-level docstring still says 'full balance within 24 hours' while constants are now 72h/24h grace — update docstring to avoid confusion."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter18_landed_sanity_terms.py"
+  ],
+  "success_rate": {"backend": "100% (7/7 executed, 1 skipped no-data)", "frontend": "not_tested"},
+  "test_credentials": "not required for this iteration (all endpoints public)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter18_landed_sanity_terms.py covers landed_estimate, sanitize_ai_estimate, payment-terms v2026.06.27.1, ru-customs calc, landed-defaults (damaged path), quiz meta+submit. Fixtures scan DB across offsets 0..1500 because first ~500 vehicles lack prices/ai_estimate. Run with REACT_APP_BACKEND_URL env set. Sample verified landed_total_rub ≈ realistic (>500k) for priced vehicles; payment bullet[3] contains 'штрафы' + '72 часов'; auction_stage tagged on all AI-carrying vehicles observed.",
+  "rca of the issue": "N/A — no bugs found in scoped changes."
+}

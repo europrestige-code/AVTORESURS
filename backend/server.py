@@ -545,5 +545,5 @@ async def shutdown_db_client():
     if telephony_service and hasattr(telephony_service, 'redis'):
         try:
             await telephony_service.redis.close()
-        except:
+        except Exception:
             pass

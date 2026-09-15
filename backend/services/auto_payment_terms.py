@@ -2,11 +2,16 @@
 
 Central place for the business policy that the user dictated:
 
-1. Winning bidders must remit the **full balance within 24 hours** of the
-   hammer drop, otherwise the win is forfeited and the deposit is held.
+1. Winning bidders are billed after the hammer drop. The **grace window**
+   (FULL_PAYMENT_GRACE_HOURS = 24 h) is the standard, penalty-free settle
+   period. From hour 25 onward we begin charging late-payment penalties
+   (storage / demurrage / auction fees). If the balance is still unpaid
+   after FULL_PAYMENT_WINDOW_HOURS = 72 h, the win is forfeited and the
+   deposit is retained against those penalties.
 2. To bid on lots with a current price (or AI-estimated recommended bid)
-   **above NZ$10,000** the user must deposit **30% of that price**, instead
-   of the flat NZ$1,000 floor used for cheaper lots.
+   **above NZ$20,000** the user must deposit 20 % (tier 1) or 30 %
+   (tier 2, > NZ$40k) of that price, instead of the flat NZ$1,000 floor
+   used for cheaper lots.
 
 These constants are used both server-side (validating deposit + bid) and
 exposed via `/api/auto/payment-terms` so the frontend can render a single
@@ -22,8 +27,9 @@ TIER1_THRESHOLD_NZD: float = 20000.0   # > $20K  -> 20%
 TIER1_PERCENT: float = 20.0
 TIER2_THRESHOLD_NZD: float = 40000.0   # > $40K  -> 30%
 TIER2_PERCENT: float = 30.0
-FULL_PAYMENT_WINDOW_HOURS: int = 24
-PAYMENT_TERMS_VERSION = "v2026.06.25.2"
+FULL_PAYMENT_WINDOW_HOURS: int = 72
+FULL_PAYMENT_GRACE_HOURS: int = 24      # informal grace before penalties kick in
+PAYMENT_TERMS_VERSION = "v2026.06.27.1"
 
 
 def reference_price_nzd(vehicle: Optional[Dict[str, Any]]) -> float:
@@ -110,6 +116,7 @@ def payment_terms_summary() -> Dict[str, Any]:
         "tier2_threshold_nzd": TIER2_THRESHOLD_NZD,
         "tier2_percent": TIER2_PERCENT,
         "full_payment_window_hours": FULL_PAYMENT_WINDOW_HOURS,
+        "full_payment_grace_hours": FULL_PAYMENT_GRACE_HOURS,
         "bullets_ru": [
             f"Базовый депозит для участия в торгах — NZ${int(BASE_DEPOSIT_NZD):,} (для лотов до NZ${int(TIER1_THRESHOLD_NZD):,}).",
             (
@@ -121,9 +128,11 @@ def payment_terms_summary() -> Dict[str, Any]:
                 f"{int(TIER2_PERCENT)}% от текущей цены."
             ),
             (
-                f"После выигрыша ставки полная сумма должна поступить в течение "
-                f"{FULL_PAYMENT_WINDOW_HOURS} часов, иначе лот возвращается на "
-                f"аукцион, а депозит удерживается."
+                f"После выигрыша мы выставляем счёт. При просрочке оплаты "
+                f"начисляются штрафы; если оплата не поступит в течение "
+                f"{FULL_PAYMENT_WINDOW_HOURS} часов, депозит удерживается, "
+                f"а лот возвращается на аукцион. Подробности — в разделе "
+                f"«Условия использования»."
             ),
             "Все суммы — в NZ$. Конвертация в ₽ по курсу на момент оплаты + 3% (включает банковский спред).",
         ],
