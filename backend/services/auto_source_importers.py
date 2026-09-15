@@ -65,6 +65,53 @@ YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 KM_RE = re.compile(r"([\d,]{2,})\s*(?:km|км)\b", re.IGNORECASE)
 
 
+# ---- Non-vehicle blacklist ----
+# Manheim NZ operates a "/trucks-machinery/" category that also hosts
+# construction gear (barriers, portable buildings, cement mixers, tree
+# diggers). Those rows aren't vehicles a Russian buyer would import — they
+# just pollute the catalog. We drop them at import time AND expose a
+# reusable predicate for a periodic DB cleanup.
+_NON_VEHICLE_URL_HINTS = (
+    "/trucks-machinery/",
+    "/machinery/",
+    "/industrial/",
+    "/construction/",
+    "/portable-buildings/",
+)
+_NON_VEHICLE_TITLE_WORDS = (
+    "portable building", "portable office", "portacom", "site office",
+    "toilet block", "toilet trailer",
+    "crash barrier", "steel barrier", "road barrier", "concrete block",
+    "concrete barrier", "kerb",
+    "cement mixer", "wheel wash", "tree digger", "skid steer attachment",
+    "hoe attachment", "rotary hoe",
+    "scaffold", "safety fence", "traffic sign",
+    "generator set", "dg set",
+    "pallet", "bin lifter", "auger", "post rammer",
+    "trailer only", "trailer chassis",
+)
+
+
+def is_non_vehicle(raw_or_doc: Dict[str, Any]) -> bool:
+    """Return True if this raw row / DB doc is clearly not a passenger vehicle.
+
+    Works with both scraper output (`title`, `source_url`) and Mongo docs
+    (`title_original`, `title_ru`, `source_url`).
+    """
+    url = (raw_or_doc.get("source_url") or "").lower()
+    if any(h in url for h in _NON_VEHICLE_URL_HINTS):
+        return True
+    title = (
+        raw_or_doc.get("title")
+        or raw_or_doc.get("title_original")
+        or raw_or_doc.get("title_ru")
+        or ""
+    ).lower()
+    if any(kw in title for kw in _NON_VEHICLE_TITLE_WORDS):
+        return True
+    return False
+
+
 def _to_float(s: Optional[str]) -> Optional[float]:
     if not s:
         return None
@@ -382,6 +429,27 @@ class ManheimImporter(SourceImporter):
             text = card.get_text(" ", strip=True)
             odo_m = self._ODO_RE.search(text)
             bid_m = self._BID_RE.search(text)
+            # Fallback price patterns for cards where the "Starting Bid"
+            # phrasing is missing but a bid or reserve is still visible.
+            price_nzd: Optional[float] = None
+            if bid_m:
+                price_nzd = float(bid_m.group(1).replace(",", ""))
+            else:
+                for pat in (
+                    r"Current\s+Bid[^$]*\$\s*([\d,]{3,})",
+                    r"Reserve\s+Price[^$]*\$\s*([\d,]{3,})",
+                    r"Buy\s+Now[^$]*\$\s*([\d,]{3,})",
+                    r"\$\s*([\d,]{4,})\b",
+                ):
+                    pm = re.search(pat, text, re.IGNORECASE)
+                    if pm:
+                        try:
+                            v = float(pm.group(1).replace(",", ""))
+                        except ValueError:
+                            continue
+                        if 100 <= v <= 3_000_000:
+                            price_nzd = v
+                            break
             # Location: usually "Suburb, City, Region"
             loc_m = re.search(r"([A-Z][A-Za-z\s]+?,\s*[A-Z][A-Za-z\s]+?,\s*[A-Z][A-Za-z\s]+?Island)", text)
             img_el = card.select_one("img")
@@ -395,7 +463,7 @@ class ManheimImporter(SourceImporter):
                 "model": model,
                 "body_type": body,
                 "mileage_km": int(odo_m.group(1).replace(",", "")) if odo_m else None,
-                "current_price_nzd": float(bid_m.group(1).replace(",", "")) if bid_m else None,
+                "current_price_nzd": price_nzd,
                 "location": _norm(loc_m.group(1)) if loc_m else None,
                 "damage_type": damage_hint,
                 "images": [img_url] if img_url else [],
@@ -576,6 +644,11 @@ class ImportOrchestrator:
             return result
         result.fetched = len(raw_items)
         for raw in raw_items:
+            # Skip obvious non-vehicles (Manheim /trucks-machinery/ pours in
+            # barriers, portable buildings, cement mixers, etc.).
+            if is_non_vehicle(raw):
+                result.skipped += 1
+                continue
             try:
                 vehicle = importer.normalise(raw)
                 existing = await find_duplicate(self.db, vehicle)
@@ -613,3 +686,24 @@ class ImportOrchestrator:
                 return ImportResult(importer=src, sync_status=AutoSyncStatus.FAILED,
                                     errors=[str(e)], finished_at=datetime.utcnow())
         return await asyncio.gather(*[_safe(s) for s in IMPORTERS.keys()])
+
+    async def cleanup_non_vehicles(self) -> Dict[str, int]:
+        """Sweep `auto_vehicles` and drop rows matching the non-vehicle
+        blacklist. Returns a count summary. Safe to run repeatedly.
+        """
+        deleted = 0
+        inspected = 0
+        # Fetch only the fields we need for is_non_vehicle().
+        cursor = self.db.auto_vehicles.find(
+            {},
+            {"id": 1, "source_url": 1, "title": 1, "title_original": 1, "title_ru": 1},
+        )
+        to_delete: List[str] = []
+        async for v in cursor:
+            inspected += 1
+            if is_non_vehicle(v):
+                to_delete.append(v.get("id"))
+        if to_delete:
+            r = await self.db.auto_vehicles.delete_many({"id": {"$in": to_delete}})
+            deleted = r.deleted_count
+        return {"inspected": inspected, "deleted": deleted}

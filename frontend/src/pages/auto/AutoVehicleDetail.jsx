@@ -9,6 +9,7 @@ import PaymentTermsBanner from "../../components/auto/PaymentTermsBanner";
 import PriceBreakdown from "../../components/auto/PriceBreakdown";
 import CountdownTimer from "../../components/auto/CountdownTimer";
 import SimilarLots from "../../components/auto/SimilarLots";
+import SoldHistory from "../../components/auto/SoldHistory";
 import { fmtPrice, fmtKm, fmtDate, LISTING_LABEL } from "../../components/auto/VehicleCard";
 import { getFxRate, formatRub } from "../../services/autoCurrency";
 
@@ -210,6 +211,7 @@ export default function AutoVehicleDetail() {
 
           <UrgencyWidget vehicle={vehicle} />
           <PriceGuidance vehicle={vehicle} />
+          <SoldHistory vehicleId={vehicle.id} />
           <PaymentTermsBanner
             compact
             vehicleDeposit={vehicleDeposit?.required}

@@ -6,8 +6,8 @@ from io import BytesIO
 from PIL import Image, ImageOps
 import base64
 import uuid
+from datetime import datetime
 from typing import Optional
-import shutil
 import logging
 
 # Set up logging
@@ -16,13 +16,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/logo", tags=["logo"])
 
-# Configuration
-UPLOAD_DIR = "/app/backend/uploads/logos"
-CURRENT_LOGO_PATH = "/app/backend/uploads/current_logo.png"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 # Remove.bg API configuration (you'll need to add REMOVE_BG_API_KEY to .env)
 REMOVE_BG_API_URL = "https://api.remove.bg/v1.0/removebg"
+
+
+async def _get_db():
+    """Late-imported MongoDB handle so this module has no import cycle."""
+    from server import db
+    return db
 
 async def remove_background_with_api(image_data: bytes) -> Optional[bytes]:
     """Remove background using remove.bg API"""
@@ -123,148 +124,107 @@ async def remove_background(image: UploadFile = File(...)):
 
 @router.post("/save")
 async def save_logo(logo: UploadFile = File(...)):
-    """Save processed logo as the current site logo"""
+    """Save processed logo as the current site logo (stored in Mongo)."""
     try:
-        # Validate file type
         if not logo.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="Файл должен быть изображением")
-        
-        # Read and validate image
         image_data = await logo.read()
-        
-        # Create unique filename
         filename = f"logo_{uuid.uuid4().hex[:8]}.png"
-        file_path = os.path.join(UPLOAD_DIR, filename)
-        
-        # Save file
-        with open(file_path, "wb") as buffer:
-            buffer.write(image_data)
-        
-        # Update current logo
-        shutil.copy2(file_path, CURRENT_LOGO_PATH)
-        
+        db = await _get_db()
+        # Mark all existing logos as non-current, then insert new one as current.
+        await db.logo_uploads.update_many({"is_current": True}, {"$set": {"is_current": False}})
+        await db.logo_uploads.insert_one({
+            "filename": filename,
+            "data": image_data,
+            "content_type": "image/png",
+            "size": len(image_data),
+            "created_at": datetime.utcnow(),
+            "is_current": True,
+        })
         logger.info(f"Logo saved successfully: {filename}")
-        
         return {
             "success": True,
             "message": "Логотип успешно сохранен",
             "filename": filename,
-            "logo_url": f"/api/logo/current"
+            "logo_url": "/api/logo/current",
         }
-        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error saving logo: {str(e)}")
         raise HTTPException(status_code=500, detail="Ошибка сохранения логотипа")
 
 @router.get("/current")
 async def get_current_logo():
-    """Get the current site logo"""
+    """Get the current site logo from Mongo."""
     try:
-        if os.path.exists(CURRENT_LOGO_PATH):
-            with open(CURRENT_LOGO_PATH, "rb") as f:
-                logo_data = f.read()
-            
-            return Response(
-                content=logo_data,
-                media_type="image/png",
-                headers={
-                    "Cache-Control": "public, max-age=3600"
-                }
-            )
-        else:
-            # Return default logo or 404
+        db = await _get_db()
+        doc = await db.logo_uploads.find_one({"is_current": True}, sort=[("created_at", -1)])
+        if not doc:
             raise HTTPException(status_code=404, detail="Логотип не найден")
-            
+        return Response(
+            content=doc["data"],
+            media_type=doc.get("content_type", "image/png"),
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving current logo: {str(e)}")
         raise HTTPException(status_code=500, detail="Ошибка получения логотипа")
 
 @router.get("/list")
 async def list_logos():
-    """Get list of all uploaded logos"""
+    """Get list of all uploaded logos from Mongo."""
     try:
+        db = await _get_db()
         logos = []
-        
-        if os.path.exists(UPLOAD_DIR):
-            for filename in os.listdir(UPLOAD_DIR):
-                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    file_path = os.path.join(UPLOAD_DIR, filename)
-                    file_stats = os.stat(file_path)
-                    
-                    logos.append({
-                        "filename": filename,
-                        "size": file_stats.st_size,
-                        "created": file_stats.st_ctime,
-                        "url": f"/api/logo/file/{filename}"
-                    })
-        
-        return {
-            "success": True,
-            "logos": sorted(logos, key=lambda x: x['created'], reverse=True)
-        }
-        
+        async for doc in db.logo_uploads.find({}, {"data": 0}).sort("created_at", -1):
+            logos.append({
+                "filename": doc.get("filename"),
+                "size": doc.get("size", 0),
+                "created": doc.get("created_at").timestamp() if doc.get("created_at") else 0,
+                "url": f"/api/logo/file/{doc.get('filename')}",
+            })
+        return {"success": True, "logos": logos}
     except Exception as e:
         logger.error(f"Error listing logos: {str(e)}")
         raise HTTPException(status_code=500, detail="Ошибка получения списка логотипов")
 
 @router.get("/file/{filename}")
 async def get_logo_file(filename: str):
-    """Get specific logo file"""
+    """Get specific logo file from Mongo."""
     try:
-        # Validate filename (security)
         if not filename.replace("_", "").replace("-", "").replace(".", "").isalnum():
             raise HTTPException(status_code=400, detail="Неверное имя файла")
-        
-        file_path = os.path.join(UPLOAD_DIR, filename)
-        
-        if not os.path.exists(file_path):
+        db = await _get_db()
+        doc = await db.logo_uploads.find_one({"filename": filename})
+        if not doc:
             raise HTTPException(status_code=404, detail="Файл не найден")
-        
-        with open(file_path, "rb") as f:
-            file_data = f.read()
-        
-        # Determine media type
-        if filename.lower().endswith('.png'):
-            media_type = "image/png"
-        elif filename.lower().endswith(('.jpg', '.jpeg')):
-            media_type = "image/jpeg"
-        elif filename.lower().endswith('.gif'):
-            media_type = "image/gif"
-        else:
-            media_type = "application/octet-stream"
-        
         return Response(
-            content=file_data,
-            media_type=media_type,
-            headers={
-                "Cache-Control": "public, max-age=3600"
-            }
+            content=doc["data"],
+            media_type=doc.get("content_type", "image/png"),
+            headers={"Cache-Control": "public, max-age=3600"},
         )
-        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving logo file: {str(e)}")
         raise HTTPException(status_code=500, detail="Ошибка получения файла")
 
 @router.delete("/file/{filename}")
 async def delete_logo(filename: str):
-    """Delete a specific logo file"""
+    """Delete a specific logo file from Mongo."""
     try:
-        # Validate filename (security)
         if not filename.replace("_", "").replace("-", "").replace(".", "").isalnum():
             raise HTTPException(status_code=400, detail="Неверное имя файла")
-        
-        file_path = os.path.join(UPLOAD_DIR, filename)
-        
-        if not os.path.exists(file_path):
+        db = await _get_db()
+        r = await db.logo_uploads.delete_one({"filename": filename})
+        if r.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Файл не найден")
-        
-        os.remove(file_path)
-        
-        return {
-            "success": True,
-            "message": f"Логотип {filename} удален"
-        }
-        
+        return {"success": True, "message": f"Логотип {filename} удален"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error deleting logo: {str(e)}")
         raise HTTPException(status_code=500, detail="Ошибка удаления логотипа")

@@ -45,40 +45,49 @@ import, AI translation/chat, automated email marketing, dark premium UI.
   inside `[current×1.05, high]`. Adds `auction_stage` tag: `opening | active | peaking`.
   Applied in both `list_vehicles()` and `get_vehicle()` at read-time (no DB writes).
 - **PriceGuidance UX** — labels renamed:
-  «Оценка аукциона ИИ» → **«Прогноз цены ухода»** (with hint "ожидаемая финальная
-  цена на торгах"); «Рекомендуемая ставка» → **«Ваш потолок ставки»** (hint
-  "выше — переплата"); «Ориентир под ключ» hint = "всё включено: таможня РФ +
-  доставка до Владивостока". New pill "Торги только открылись — финальная будет
-  выше" surfaces when `auction_stage=opening`. Disclaimer rewritten so customers
-  don't misread the AI forecast as "site wants 5× the current bid".
-- **Payment terms softened**  — `FULL_PAYMENT_WINDOW_HOURS` moved from 24 → 72,
-  new `FULL_PAYMENT_GRACE_HOURS=24`, `bullets_ru[3]` reworded to "штрафы с
-  25-го часа + депозит удерживается после 72 часов". Version bumped to
-  `v2026.06.27.1`.
-- **PaymentTermsBanner** — dropped the harsh "Полная оплата — 24 часа / депозит
-  удерживается" row from the vehicle page. Compact mode gets a one-liner link
-  to `/auto/terms#terms-section-7`; full mode gets a footnote paragraph.
-- **AutoTerms.jsx** — new section 7 «Сроки оплаты после выигрыша и штрафы» with
-  softened three-paragraph wording (24 h standard, штрафы from hour 25, forfeit
-  only after 72 h). Sections 8/9 shifted.
-- **Quiz Save-Search CTA** — new `QuizSaveSearch.jsx` mounted at the end of the
-  quiz result view. Neat, in-line-with-design panel (subtle blue tint, Bell
-  micro-icon in existing `auto-btn`), maps quiz form → SavedSearchFilters
-  (budget_nzd_max, first body_type, country, damage_only from repair="any").
-- **Catalog sort fix** — first ~500 vehicles were price-less scrapes, so the
-  default catalog was empty of numbers. Aggregation now sorts by `_has_price
-  DESC, created_at DESC` — priced items always surface first.
-- **Auth import fix** — pre-existing missing `AutoLogisticsStatus` import in
-  `services/auto_service.py` (used in `_on_vehicle_won`).
-- **CSS** — closed an unclosed `.auction-event__empty` block that had corrupted
-  the payment-terms + admin-2FA rules; added `.payment-terms__link` +
-  `.quiz-save*` styles.
+  «Оценка аукциона ИИ» → **«Прогноз цены ухода»**; «Рекомендуемая ставка» →
+  **«Ваш потолок ставки»**; «Ориентир под ключ» hint = "всё включено: таможня РФ
+  + доставка до Владивостока". New pill "Торги только открылись — финальная
+  будет выше" appears when `auction_stage=opening`. Disclaimer rewritten so
+  customers don't misread the AI forecast as "site wants 5× the current bid".
+- **Payment terms softened** — `FULL_PAYMENT_WINDOW_HOURS` moved from 24 → 72,
+  new `FULL_PAYMENT_GRACE_HOURS=24`. Version bumped to `v2026.06.27.1`.
+- **PaymentTermsBanner** — dropped the harsh "Полная оплата — 24 часа" row from
+  the vehicle page. Compact mode gets a one-liner link to `/auto/terms#terms-section-7`.
+- **AutoTerms.jsx** — new section 7 «Сроки оплаты после выигрыша и штрафы»
+  (24 h standard, штрафы from hour 25, forfeit only after 72 h).
+- **Quiz Save-Search CTA** — new `QuizSaveSearch.jsx` at end of quiz result.
+  Maps quiz form → SavedSearchFilters, Bell icon in existing `auto-btn` style.
+- **Catalog sort fix** — aggregation now sorts by `_has_price DESC, created_at DESC`.
+- **Backend tests iter18** — 7/7 pass.
 
-## Backend tests
-- `/app/backend/tests/test_iter18_landed_sanity_terms.py` (iter18) — 7/7 pass,
-  0 critical. Verified: `landed_estimate` on `/vehicles/{id}`, sanity + stage
-  on list, `/payment-terms` v2026.06.27.1 with 72h + softened bullets_ru[3],
-  `/ru-customs/calc`, `/vehicles/{id}/landed-defaults`, `/quiz/meta+submit`.
+## Done in iter19 (27.06.2026) — follow-up work
+- **Catalog clean-up** — new `is_non_vehicle()` predicate in
+  `services/auto_source_importers.py` drops Manheim `/trucks-machinery/`
+  category rows (barriers, portable buildings, cement mixers, tree diggers,
+  concrete blocks, portable toilets). Wired into `ImportOrchestrator.run_one()`
+  so future imports skip them, and exposed as
+  `POST /api/auto/admin/sources/cleanup-non-vehicles` for one-shot DB sweeps.
+  First sweep deleted **155 rows** — catalog went 1603 → 1448 real vehicles.
+- **Manheim price fallback** — extended `_parse_search()` with four regex
+  fallbacks (Current Bid / Reserve Price / Buy Now / bare `$X,XXX`) so cards
+  that don't literally say "Starting Bid" still get `current_price_nzd`
+  populated. Bounded to $100–$3M to filter out lot numbers / phone digits.
+- **Sold-history widget** — new `services/auto_sold_history.py` +
+  `GET /api/auto/vehicles/{id}/sold-history` endpoint. Prefers real
+  `auction_observations` (sold=true, same make/model, year±N). Falls back to
+  live catalog prices with a `source: 'current_listings'` flag so the frontend
+  can label «Похожие выставлены за» vs «Похожие проданы за». New tile
+  `components/auto/SoldHistory.jsx` mounted between PriceGuidance and
+  PaymentTermsBanner. Auto-hides on `source: 'insufficient'`.
+- **Deposit uploads on Mongo** — refactored `POST /deposit/upload` and
+  `GET /deposit/{id}/proof` to store receipt bytes in a new
+  `auto_deposit_proofs` collection instead of the pod-local disk (ephemeral
+  in production).
+- **Backend tests iter19** — 13/13 pass. Minor items flagged: catalog `limit>100`
+  silently returns [] (clamp or 422), URL blacklist may drop legit
+  light-commercial vans, sold-history needs seed observations for the
+  `sold_observations` branch regression.
 
 ## V2 backlog (post-MVP)
 - 🟡 **P1** — Market Intelligence Engine Phase 2: Playwright/WebSocket capture

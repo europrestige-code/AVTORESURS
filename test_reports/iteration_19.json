@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 19 backend verification: (1) is_non_vehicle() predicate correctly flags Manheim /trucks-machinery/ URLs, portable-building titles, and title_original/title_ru fields, while leaving passenger-URL Toyota Corollas untouched. (2) Catalog GET /vehicles has no barrier/portable-building/cement-mixer rows on page 1 or across a broad multi-page sweep (offsets 0..1500). (3) GET /vehicles/{id}/sold-history returns source='current_listings' with count/min/max/median/avg for a common make/model, and produces well-formed payload for rare pairs. (4) POST /admin/sources/cleanup-non-vehicles requires JWT (401 without auth), succeeds with admin JWT (no MFA needed — endpoint is in main auto_routes.py with local require_admin dep, not the MFA-guarded sub-router), and is idempotent (second call deleted==0). (5) Regressions: /payment-terms still v2026.06.27.1 / 72h; /vehicles/{id} still surfaces landed_estimate.landed_total_rub for priced rows. Total: 13 passed, 0 failed, 0 skipped.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/auto/vehicles",
+        "issue": "Passing limit>100 (e.g. 150, 200) silently returns an empty list instead of clamping to the max or 422-ing. Discovered while broadening test scans. Consider pinning to max and/or documenting the cap in the response envelope."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter19_catalog_sold_history.py",
+    "/app/test_reports/pytest/iter19.xml"
+  ],
+  "action_items": [
+    "Consider clamping /api/auto/vehicles limit param (currently limit>100 → empty result silently); either clamp or return 422.",
+    "Seed a couple of auction_observations rows so sold-history can be regressed with source='sold_observations' branch, not only 'current_listings' fallback."
+  ],
+  "critical_code_review_comments": [
+    "auto_source_importers.is_non_vehicle() URL blacklist includes '/trucks-machinery/' which will drop all Manheim truck category rows — correct per spec but note this eliminates legitimate light-commercial vans that live under the same URL prefix (e.g. Hiace, Transit). If any van models should be kept, the URL rule may need per-slug allowlisting.",
+    "auto_sold_history.similar_sold_history uses case-insensitive exact regex on make/model; small make-name typos in DB (e.g. 'Toyota ' with trailing space, 'BMW ' variants) will produce false 'insufficient'. Consider trimming/normalising during query build.",
+    "cleanup_non_vehicles inspects ALL auto_vehicles rows in-memory per call. For a 1600-row DB this is fine, but consider streaming delete_many with a $or query on url-hints and title regexes instead of a full-collection cursor for future scale.",
+    "GET /api/auto/vehicles silently returns an empty list when limit exceeds a hidden internal cap (observed at 150). Either clamp+return or 422 — silent empty is misleading for API consumers."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter19_catalog_sold_history.py"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "not_tested"},
+  "test_credentials": "admin@buyanywhere.com / admin12345 (loaded from /app/memory/test_credentials.md). Cleanup endpoint uses main auto_routes.require_admin — no MFA required.",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter19_catalog_sold_history.py covers is_non_vehicle unit tests (URL + title fields), catalog cleanliness sweep, sold-history endpoint (current_listings fallback branch — auction_observations branch not exercised because no sold obs in DB), admin cleanup idempotency, and regressions for payment-terms v2 + landed_estimate. IMPORTANT: /api/auto/vehicles caps limit around 100 — using limit>=150 returns []. Always paginate with limit=100. The admin cleanup endpoint lives in main auto_routes.py and uses the local require_admin (JWT only, no 2FA), unlike sub-router admin endpoints which require X-Admin-MFA-Token.",
+  "rca of the issue": "N/A — all in-scope changes verified green."
+}

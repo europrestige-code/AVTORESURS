@@ -697,6 +697,20 @@ async def admin_sources_runs(
     return items
 
 
+@router.post("/admin/sources/cleanup-non-vehicles")
+async def admin_cleanup_non_vehicles(
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """One-shot sweep of `auto_vehicles` that drops non-vehicle rows
+    (construction gear, portable buildings, road barriers, etc.). Safe
+    to run repeatedly — the same predicate now runs at import time too.
+    """
+    from services.auto_source_importers import ImportOrchestrator
+    orch = ImportOrchestrator(db=db)
+    return await orch.cleanup_non_vehicles()
+
+
 @router.get("/admin/scheduler/status")
 async def admin_scheduler_status(_: Dict[str, Any] = Depends(require_admin)):
     from services import auto_scheduler
@@ -1166,33 +1180,33 @@ async def deposit_upload(
         raise HTTPException(400, "Неверный метод оплаты.")
     proof_name: Optional[str] = None
     if payment_proof_file is not None and payment_proof_file.filename:
-        # Save to disk under /app/backend/uploads/deposits/
+        # Persist the receipt bytes into Mongo so we don't depend on
+        # pod-local disk (which is ephemeral in production).
         ALLOWED = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif"}
         MAX_BYTES = 10 * 1024 * 1024  # 10 MB
         ext = os.path.splitext(payment_proof_file.filename)[1].lower()
         if ext not in ALLOWED:
             raise HTTPException(400, "Допустимы файлы: PDF, PNG, JPG, WEBP, HEIC.")
-        uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "deposits")
-        os.makedirs(uploads_dir, exist_ok=True)
+        buf = bytearray()
+        while True:
+            chunk = await payment_proof_file.read(1024 * 1024)
+            if not chunk:
+                break
+            buf.extend(chunk)
+            if len(buf) > MAX_BYTES:
+                raise HTTPException(400, "Файл слишком большой (макс. 10 МБ).")
         import uuid as _uuid
-        stored_name = f"{_uuid.uuid4().hex}{ext}"
-        stored_path = os.path.join(uploads_dir, stored_name)
-        bytes_read = 0
-        with open(stored_path, "wb") as f:
-            while True:
-                chunk = await payment_proof_file.read(1024 * 1024)
-                if not chunk:
-                    break
-                bytes_read += len(chunk)
-                if bytes_read > MAX_BYTES:
-                    f.close()
-                    try:
-                        os.remove(stored_path)
-                    except OSError:
-                        pass
-                    raise HTTPException(400, "Файл слишком большой (макс. 10 МБ).")
-                f.write(chunk)
-        proof_name = stored_name
+        proof_id = _uuid.uuid4().hex
+        await svc.db.auto_deposit_proofs.insert_one({
+            "id": proof_id,
+            "filename": f"{proof_id}{ext}",
+            "content_type": payment_proof_file.content_type or "application/octet-stream",
+            "size": len(buf),
+            "data": bytes(buf),
+            "uploaded_by": user["id"],
+            "created_at": datetime.utcnow(),
+        })
+        proof_name = proof_id
     deposit = AutoDeposit(
         user_id=user["id"],
         amount=float(amount),
@@ -1211,21 +1225,28 @@ async def get_deposit_proof(
     user: Dict[str, Any] = Depends(require_user),
     svc: AutoService = Depends(get_auto_service),
 ):
-    """Download deposit proof file. Owner or admin only."""
+    """Download deposit proof file. Owner or admin only.
+
+    Proofs are stored inline in Mongo (`auto_deposit_proofs`) since
+    pod-local disk is ephemeral in production.
+    """
     deposit = await svc.db.auto_deposits.find_one({"id": deposit_id})
     if not deposit:
         raise HTTPException(404, "Депозит не найден.")
     if user["id"] != deposit["user_id"] and user.get("role") != "admin":
         raise HTTPException(403, "Доступ запрещён.")
-    fname = deposit.get("payment_proof_file")
-    if not fname:
+    proof_id = deposit.get("payment_proof_file")
+    if not proof_id:
         raise HTTPException(404, "Файл подтверждения не загружен.")
-    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "deposits")
-    fpath = os.path.join(uploads_dir, fname)
-    if not os.path.exists(fpath):
-        raise HTTPException(404, "Файл не найден на диске.")
-    from fastapi.responses import FileResponse
-    return FileResponse(fpath, filename=fname)
+    doc = await svc.db.auto_deposit_proofs.find_one({"id": proof_id})
+    if not doc:
+        raise HTTPException(404, "Файл не найден.")
+    from fastapi.responses import Response
+    return Response(
+        content=doc["data"],
+        media_type=doc.get("content_type", "application/octet-stream"),
+        headers={"Content-Disposition": f'inline; filename="{doc.get("filename", proof_id)}"'},
+    )
 
 
 @router.post("/deposit/stripe/session")
@@ -1873,6 +1894,27 @@ async def vehicles_similar(
             seen.add(d["id"])
             if len(items) >= int(limit): break
     return {"items": items[: int(limit)]}
+
+
+@router.get("/vehicles/{vehicle_id}/sold-history")
+async def vehicles_sold_history(
+    vehicle_id: str,
+    year_window: int = 2,
+    svc: AutoService = Depends(get_auto_service),
+):
+    """«Похожие проданы за NZ$X–Y» tile data.
+
+    Returns aggregated hammer-price stats for similar vehicles. If our
+    `auction_observations` collection has enough sold rows for the same
+    make/model/year±N, we use them; otherwise we fall back to current live
+    listing prices of comparable lots and flag the source so the frontend
+    can label the tile appropriately.
+    """
+    from services.auto_sold_history import similar_sold_history
+    v = await svc.db.auto_vehicles.find_one({"id": vehicle_id}, {"_id": 0})
+    if not v:
+        raise HTTPException(404, "Not found")
+    return await similar_sold_history(svc.db, v, year_window=int(year_window))
 
 
 
