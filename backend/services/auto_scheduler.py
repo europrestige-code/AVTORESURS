@@ -113,7 +113,7 @@ async def _campaign_loop(db) -> None:
 
 def start(db) -> None:
     """Start both background loops. Safe to call once at startup."""
-    global _auc_task, _camp_task, _intel_task, _saved_search_task
+    global _auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task
     loop = asyncio.get_event_loop()
     if not _auc_task or _auc_task.done():
         _auc_task = loop.create_task(_refresh_loop(db), name="auto-auctions-refresh")
@@ -127,6 +127,9 @@ def start(db) -> None:
     if not _saved_search_task or _saved_search_task.done():
         _saved_search_task = loop.create_task(_saved_search_loop(db), name="auto-saved-searches")
         logger.info("[scheduler] started saved-search notifier (15 min)")
+    if not _hammer_task or _hammer_task.done():
+        _hammer_task = loop.create_task(_hammer_loop(db), name="auto-hammer-capture")
+        logger.info("[scheduler] started hammer-price capture (6h)")
 
 
 _intel_task = None
@@ -161,14 +164,24 @@ async def _intel_loop(db) -> None:
 
 
 def stop() -> None:
-    global _auc_task, _camp_task, _intel_task, _saved_search_task
-    for t in (_auc_task, _camp_task, _intel_task, _saved_search_task):
+    global _auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task
+    for t in (_auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task):
         if t and not t.done():
             t.cancel()
 
 
 SAVED_SEARCH_INTERVAL_SECONDS = 15 * 60  # 15 minutes
 SAVED_SEARCH_INITIAL_DELAY_SECONDS = 180
+
+# Hammer-price capture — sweep stale catalog rows into `auction_observations`
+# as inferred "sold" observations. Cheap query, so we can run it every 6h.
+HAMMER_INTERVAL_SECONDS = 6 * 60 * 60
+HAMMER_INITIAL_DELAY_SECONDS = 300
+HAMMER_STALE_HOURS = 48
+
+_hammer_task = None
+_last_hammer_at: Optional[datetime] = None
+_last_hammer_result: Optional[list] = None
 
 
 async def _saved_search_loop(db) -> None:
@@ -194,6 +207,40 @@ async def _saved_search_loop(db) -> None:
         await asyncio.sleep(SAVED_SEARCH_INTERVAL_SECONDS)
 
 
+async def _hammer_loop(db) -> None:
+    """Every 6h: capture inferred hammer prices from the catalog.
+
+    Two phases per tick:
+      1. `snapshot_all` — records every priced live listing as an
+         "official_listing" observation (deduped per 24h).  Gives the AI
+         estimator + sold-history a broader base while we wait for real
+         hammer data to accrue.
+      2. `sweep_stale_all` — lots that stop reappearing for ~48h are
+         inferred sold; their last observed price is stored with
+         `sold=True` so the Sold History widget serves real ranges.
+    """
+    global _last_hammer_at, _last_hammer_result
+    from services.auto_hammer_capture import snapshot_all, sweep_stale_all
+    await asyncio.sleep(HAMMER_INITIAL_DELAY_SECONDS)
+    while True:
+        try:
+            snap = await snapshot_all(db)
+            sold = await sweep_stale_all(db, stale_hours=HAMMER_STALE_HOURS)
+            _last_hammer_at = datetime.utcnow()
+            _last_hammer_result = {"snapshot": snap, "sweep": sold}
+            snap_count = sum(r.get("captured", 0) for r in snap)
+            sold_count = sum(r.get("captured", 0) for r in sold)
+            if snap_count or sold_count:
+                logger.info(
+                    f"[scheduler] hammer capture: snapshot={snap_count}, sold={sold_count}"
+                )
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"[scheduler] hammer capture failed: {e}")
+        await asyncio.sleep(HAMMER_INTERVAL_SECONDS)
+
+
 def status() -> dict:
     return {
         "auctions": {
@@ -213,5 +260,12 @@ def status() -> dict:
             "interval_seconds": SAVED_SEARCH_INTERVAL_SECONDS,
             "last_run_at": _last_saved_search_at.isoformat() if _last_saved_search_at else None,
             "last_result": _last_saved_search_result,
+        },
+        "hammer_capture": {
+            "running": bool(_hammer_task and not _hammer_task.done()),
+            "interval_seconds": HAMMER_INTERVAL_SECONDS,
+            "stale_hours": HAMMER_STALE_HOURS,
+            "last_run_at": _last_hammer_at.isoformat() if _last_hammer_at else None,
+            "last_result": _last_hammer_result,
         },
     }

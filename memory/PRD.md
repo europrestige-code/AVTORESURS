@@ -99,6 +99,24 @@ import, AI translation/chat, automated email marketing, dark premium UI.
   building, steel barrier, cement mixer, trailer chassis, …) still win.
 - **Backend tests iter20** — 14/14 pass, 0 critical.
 
+## Done in iter21 (27.06.2026) — hammer-price capture
+- **`services/auto_hammer_capture.py`** — two-phase pipeline for real sold
+  data:
+  - `snapshot_current_listings()` writes an `official_listing` observation
+    for every priced live lot (deduped per {source, lot_ref, price} within
+    24 h). Feeds the AI estimator with broader base while sold data
+    accumulates. Snapshot pass populated **200 observations** immediately.
+  - `sweep_stale_as_sold()` — lots not re-scraped in the last 48 h AND
+    actively-touched within the last 5 days become `sold=True`,
+    `source_type='public_archive'` observations. Their `status` also
+    flips to `sold`. The 5-day active-window guard prevents mass false
+    positives from initial-batch imports whose rows never get re-touched.
+- **Scheduler** — new `_hammer_loop` in `auto_scheduler.py` runs every 6 h,
+  interleaves snapshot + sweep, and reports via `status()`.
+- **Admin endpoint** `POST /api/auto/admin/sources/capture-hammer?stale_hours=N`
+  triggers both phases manually.
+- **Backend tests iter21** — 12/12 pass, 0 critical.
+
 ## V2 backlog (post-MVP)
 - 🟡 **P1** — Market Intelligence Engine Phase 2: Playwright/WebSocket capture
   for live Simulcast prices (currently only AI-estimated).

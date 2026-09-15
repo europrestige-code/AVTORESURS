@@ -711,6 +711,26 @@ async def admin_cleanup_non_vehicles(
     return await orch.cleanup_non_vehicles()
 
 
+@router.post("/admin/sources/capture-hammer")
+async def admin_capture_hammer(
+    stale_hours: int = 48,
+    _: Dict[str, Any] = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Manually trigger the hammer-price capture sweep.
+
+    Runs both phases: `snapshot_all` (records every priced live listing as
+    an `official_listing` observation, deduped in 24h) and `sweep_stale_all`
+    (lots that stop reappearing for `stale_hours` are inferred sold; their
+    last observed price is stored with `sold=True` so the Sold History
+    widget can render real ranges). Safe to call repeatedly.
+    """
+    from services.auto_hammer_capture import snapshot_all, sweep_stale_all
+    snap = await snapshot_all(db)
+    sold = await sweep_stale_all(db, stale_hours=int(stale_hours))
+    return {"snapshot": snap, "sweep": sold}
+
+
 @router.get("/admin/scheduler/status")
 async def admin_scheduler_status(_: Dict[str, Any] = Depends(require_admin)):
     from services import auto_scheduler

@@ -1,0 +1,24 @@
+{
+  "summary": "Iter21 hammer-price capture pipeline — all 12 backend tests passed. Verified snapshot_current_listings (insertion + 24h dedup), sweep_stale_as_sold (captures stale rows into public_archive observations, flips status→sold, dedups on second run), the 5-day active-window guard (skips out-of-window rows), POST /api/auto/admin/sources/capture-hammer (admin auth OK, both phases returned for turners + manheim), sold-history endpoint regression (falls back to current_listings, min/max/median populated), scheduler wiring (HAMMER_INTERVAL_SECONDS=21600, HAMMER_STALE_HOURS=48, status() has hammer_capture key with all required subkeys), and iter20 is_non_vehicle whitelist regression (Hiace/Transit/Sprinter/Hilux → False, portable building/mixer → True). Test rows cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_hammer_capture_iter21.py",
+    "/app/test_reports/pytest/iter21_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "auto_hammer_capture.sweep_stale_as_sold uses datetime.now(timezone.utc).replace(tzinfo=None) for stale/active cuts but datetime.utcnow() elsewhere — consistent but naive. Fine while last_sync_time is also naive UTC.",
+    "sweep_stale_as_sold dedup query filters on {source, lot_ref, sold:True}. If lot_ref is None it skips dedup and always inserts a new observation each sweep — acceptable given the price/lot fallback but worth documenting.",
+    "snapshot_current_listings second-call dedup uses exact-price match within 24h; if scraper mutates current_price_nzd between calls a new obs is created (by design)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_hammer_capture_iter21.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "n/a (skipped per request)"},
+  "test_credentials": "admin@buyanywhere.com / admin12345 (admin login succeeded, no 2FA blocked)",
+  "seed_data_creation": "Temporarily inserted TEST_LOT_ITER21_STALE and TEST_LOT_ITER21_OUT_OF_WINDOW into auto_vehicles/auction_observations; both cleaned up in try/finally.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter21 hammer capture verified fully at services + endpoint + scheduler level. The endpoint /api/auto/admin/sources/capture-hammer runs both phases; snapshot dedup is exact-price/24h and sweep dedup is per-lot_ref sold=True. Sold-history endpoint still works as regression (Toyota-based fallback path). Test file test_hammer_capture_iter21.py is idempotent and safe to re-run."
+}
