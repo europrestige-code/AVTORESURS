@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 22 backend testing: verified new /api/auto/preset-counts endpoint, van/pickup preset regex, scraper autoloop wiring in auto_scheduler, plus regressions on body-type-counts, capture-hammer, sold-history, and is_non_vehicle whitelist. 8/8 pytest tests passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter22_scraper_presets.py",
+    "/app/test_reports/pytest/iter22.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PRESET_FILTERS regex in auto_routes.py mirrors _VEHICLE_TITLE_WORDS in auto_source_importers.py — consider extracting to a shared constants module to avoid drift when new pickup/van models are added.",
+    "auto_routes.py is ~1800 lines; approaching split threshold — presets, scheduler-status and admin/intel endpoints could each move into routes/auto/ submodules.",
+    "auto_scheduler.py uses module-level globals for every loop's state — consider a small dataclass registry to make status()/stop() less error-prone as more loops are added."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter22_scraper_presets.py"],
+  "success_rate": {"backend": "100%", "frontend": "not_tested"},
+  "test_credentials": "admin@buyanywhere.com / admin12345",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test file /app/backend/tests/test_iter22_scraper_presets.py covers preset-counts, /api/auto/vehicles?search=<regex> matching, scheduler module constants + status() shape (scraper_autoloop key), body-type-counts, capture-hammer, sold-history, and is_non_vehicle. Note: blacklist uses 'cement mixer' not 'concrete mixer'. Verified live counts: van_pickup preset count > 100 (was ~267 at test time); /api/auto/vehicles total drift within 10% tolerance. Scheduler constants SCRAPER_INTERVAL_SECONDS=3600, SCRAPER_LIMIT_PER_SOURCE=50 confirmed.",
+  "rca of the issue": "n/a — no bugs found"
+}

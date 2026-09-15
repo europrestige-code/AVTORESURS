@@ -117,6 +117,22 @@ import, AI translation/chat, automated email marketing, dark premium UI.
   triggers both phases manually.
 - **Backend tests iter21** — 12/12 pass, 0 critical.
 
+## Done in iter22 (27.06.2026) — scraper autoloop + van chip
+- **Scraper autoloop** — new `_scraper_loop` in `auto_scheduler.py`.
+  Runs `ImportOrchestrator.run_all(limit_per_source=50)` every hour after a
+  90 s initial delay so the catalog auto-refreshes without an admin poke.
+  Per-source failures stay isolated. `status()['scraper_autoloop']` shows
+  the last run's per-source `{fetched, created, updated, skipped, failed}`.
+- **Van & Pickup preset chip** — new `PRESET_FILTERS` dict in
+  `auto_routes.py` + `GET /preset-counts` endpoint. The `van_pickup` regex
+  covers 60+ vans and utility models (Hiace, Transit, Sprinter, Vito,
+  Crafter, Ducato, Master, Hilux, Ranger, Navara, Amarok, BT-50,
+  Colorado, D-Max, Tacoma, F-150 …). New `PresetChips.jsx` renders a
+  pill "Фургоны и пикапы (267)" under `BodyTypeStrip` on `/auto` and
+  `/auto/catalog`. Clicking applies the regex via the existing catalog
+  `search` filter — jumps straight to 267 vehicles.
+- **Backend tests iter22** — 8/8 pass, 0 critical.
+
 ## V2 backlog (post-MVP)
 - 🟡 **P1** — Market Intelligence Engine Phase 2: Playwright/WebSocket capture
   for live Simulcast prices (currently only AI-estimated).

@@ -113,7 +113,7 @@ async def _campaign_loop(db) -> None:
 
 def start(db) -> None:
     """Start both background loops. Safe to call once at startup."""
-    global _auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task
+    global _auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task, _scraper_task
     loop = asyncio.get_event_loop()
     if not _auc_task or _auc_task.done():
         _auc_task = loop.create_task(_refresh_loop(db), name="auto-auctions-refresh")
@@ -127,6 +127,9 @@ def start(db) -> None:
     if not _saved_search_task or _saved_search_task.done():
         _saved_search_task = loop.create_task(_saved_search_loop(db), name="auto-saved-searches")
         logger.info("[scheduler] started saved-search notifier (15 min)")
+    if not _scraper_task or _scraper_task.done():
+        _scraper_task = loop.create_task(_scraper_loop(db), name="auto-scraper-autoloop")
+        logger.info("[scheduler] started scraper autoloop (hourly)")
     if not _hammer_task or _hammer_task.done():
         _hammer_task = loop.create_task(_hammer_loop(db), name="auto-hammer-capture")
         logger.info("[scheduler] started hammer-price capture (6h)")
@@ -164,14 +167,26 @@ async def _intel_loop(db) -> None:
 
 
 def stop() -> None:
-    global _auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task
-    for t in (_auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task):
+    global _auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task, _scraper_task
+    for t in (_auc_task, _camp_task, _intel_task, _saved_search_task, _hammer_task, _scraper_task):
         if t and not t.done():
             t.cancel()
 
 
 SAVED_SEARCH_INTERVAL_SECONDS = 15 * 60  # 15 minutes
 SAVED_SEARCH_INITIAL_DELAY_SECONDS = 180
+
+# Scraper autoloop — runs ImportOrchestrator.run_all() every hour so the
+# catalog auto-refreshes without an admin having to click "Import all".
+# Each source is limited to 50 rows per tick to stay under polite scraping
+# rate limits.  Failures in one source do not affect the others.
+SCRAPER_INTERVAL_SECONDS = 60 * 60
+SCRAPER_INITIAL_DELAY_SECONDS = 90
+SCRAPER_LIMIT_PER_SOURCE = 50
+
+_scraper_task = None
+_last_scraper_at: Optional[datetime] = None
+_last_scraper_result: Optional[dict] = None
 
 # Hammer-price capture — sweep stale catalog rows into `auction_observations`
 # as inferred "sold" observations. Cheap query, so we can run it every 6h.
@@ -205,6 +220,50 @@ async def _saved_search_loop(db) -> None:
         except Exception as e:
             logger.warning(f"[scheduler] saved-search loop failed: {e}")
         await asyncio.sleep(SAVED_SEARCH_INTERVAL_SECONDS)
+
+async def _scraper_loop(db) -> None:
+    """Every hour: run every source importer with a modest per-tick limit.
+
+    `ImportOrchestrator.run_all()` isolates failures per source — a broken
+    scraper doesn't stop the rest. `is_non_vehicle` runs inside `run_one`,
+    so no barriers / portable buildings leak in.
+    """
+    global _last_scraper_at, _last_scraper_result
+    from services.auto_source_importers import ImportOrchestrator
+    await asyncio.sleep(SCRAPER_INITIAL_DELAY_SECONDS)
+    while True:
+        try:
+            orch = ImportOrchestrator(db=db)
+            results = await orch.run_all(limit_per_source=SCRAPER_LIMIT_PER_SOURCE)
+            _last_scraper_at = datetime.utcnow()
+            _last_scraper_result = {
+                "sources": [
+                    {
+                        "importer": r.importer,
+                        "fetched": r.fetched,
+                        "created": r.created,
+                        "updated": r.updated,
+                        "skipped": r.skipped,
+                        "failed": r.failed,
+                        "status": r.sync_status.value if hasattr(r.sync_status, "value") else str(r.sync_status),
+                    }
+                    for r in results
+                ],
+            }
+            created = sum(r.created for r in results)
+            updated = sum(r.updated for r in results)
+            if created or updated:
+                logger.info(
+                    f"[scheduler] scrapers: +{created} new, {updated} updated, "
+                    f"{sum(r.skipped for r in results)} skipped"
+                )
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning(f"[scheduler] scraper autoloop failed: {e}")
+        await asyncio.sleep(SCRAPER_INTERVAL_SECONDS)
+
+
 
 
 async def _hammer_loop(db) -> None:
@@ -267,5 +326,12 @@ def status() -> dict:
             "stale_hours": HAMMER_STALE_HOURS,
             "last_run_at": _last_hammer_at.isoformat() if _last_hammer_at else None,
             "last_result": _last_hammer_result,
+        },
+        "scraper_autoloop": {
+            "running": bool(_scraper_task and not _scraper_task.done()),
+            "interval_seconds": SCRAPER_INTERVAL_SECONDS,
+            "limit_per_source": SCRAPER_LIMIT_PER_SOURCE,
+            "last_run_at": _last_scraper_at.isoformat() if _last_scraper_at else None,
+            "last_result": _last_scraper_result,
         },
     }

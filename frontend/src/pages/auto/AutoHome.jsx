@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import autoApi from "../../services/autoApi";
 import BodyTypeStrip from "../../components/auto/BodyTypeStrip";
+import PresetChips from "../../components/auto/PresetChips";
 import LiveMarketStrip from "../../components/auto/LiveMarketStrip";
 import DepositExplainer from "../../components/auto/DepositExplainer";
 import EndingSoonCarousel from "../../components/auto/EndingSoonCarousel";
@@ -224,6 +225,7 @@ export default function AutoHome() {
 
       <section className="mx-auto max-w-7xl px-6 pt-6" data-testid="body-type-strip-section">
         <BodyTypeStrip />
+        <PresetChips className="mt-2" />
       </section>
 
       <EndingSoonCarousel />

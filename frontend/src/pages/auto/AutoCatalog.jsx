@@ -5,6 +5,7 @@ import VehicleCard from "../../components/auto/VehicleCard";
 import VehicleFilters from "../../components/auto/VehicleFilters";
 import SearchHero from "../../components/auto/SearchHero";
 import SaveSearchButton from "../../components/auto/SaveSearchButton";
+import PresetChips from "../../components/auto/PresetChips";
 
 const LIMIT = 12;
 
@@ -67,6 +68,18 @@ export default function AutoCatalog() {
       <SearchHero
         variant="catalog"
         activeBodyType={filters.body_type || null}
+      />
+      <PresetChips
+        activeKey={searchParams.get("preset") || null}
+        onSelect={(chip) => {
+          setOffset(0);
+          const next = { ...filters, search: chip.regex };
+          setFilters(next);
+          const params = new URLSearchParams(searchParams);
+          params.set("search", chip.regex);
+          params.set("preset", chip.key);
+          setSearchParams(params);
+        }}
       />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", margin: "18px 0 12px" }}>
         <div>

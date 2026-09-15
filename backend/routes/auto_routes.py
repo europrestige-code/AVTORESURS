@@ -842,6 +842,54 @@ async def body_type_counts(svc: AutoService = Depends(get_auto_service)):
     return {"items": items, "total": sum(i["count"] for i in items)}
 
 
+# --- Preset filters — chip strips for narrow but popular slices of stock ---
+# `regex` values are passed straight to the catalog's `search` filter, so the
+# chip is a pure client-side navigate. We enumerate counts here so the chip
+# can show live totals.
+PRESET_FILTERS = {
+    "van_pickup": {
+        "label_ru": "Фургоны и пикапы",
+        "regex": (
+            r"hiace|hi\-ace|regius|granvia|caravan|nv350|nv200|"
+            r"sprinter|transit|tourneo|ducato|boxer|jumper|relay|expert|"
+            r"partner|master|trafic|kangoo|crafter|vito|viano|v[- ]class|"
+            r"iveco|transporter|caravelle|multivan|delica|bongo|"
+            r"hilux|surf|land\s*cruiser|landcruiser|prado|"
+            r"ranger|colorado|d[- ]?max|isuzu ute|"
+            r"navara|np300|frontier|amarok|bt[- ]?50|"
+            r"tacoma|tundra|silverado|f[- ]?150|f[- ]?250|"
+            r"titan|ridgeline|l\s*200|triton|strada|"
+            r"patrol|pajero|montero|trooper|wrangler|gladiator"
+        ),
+    },
+}
+
+
+@router.get("/preset-counts")
+async def preset_counts(svc: AutoService = Depends(get_auto_service)):
+    """Live counts per chip so the strip can show "(N)" on each preset.
+    Only counts vehicles with `status=available` — the same slice the
+    catalog queries by default.
+    """
+    items = []
+    for key, cfg in PRESET_FILTERS.items():
+        n = await svc.db.auto_vehicles.count_documents({
+            "status": "available",
+            "$or": [
+                {"title_original": {"$regex": cfg["regex"], "$options": "i"}},
+                {"title_ru": {"$regex": cfg["regex"], "$options": "i"}},
+                {"model": {"$regex": cfg["regex"], "$options": "i"}},
+            ],
+        })
+        items.append({
+            "key": key,
+            "label_ru": cfg["label_ru"],
+            "regex": cfg["regex"],
+            "count": n,
+        })
+    return {"items": items}
+
+
 # ===== Market Intelligence Engine — Phase 1 =====
 
 
